@@ -10,3 +10,5 @@ description: Build and open the token-ledger HTML report (cost and tokens by wor
 3. Open the printed file for the user and summarize in a few lines: total cost, the three most expensive work units, and any work unit flagged NEW (offer `/token-ledger:vocab` to merge or rename).
 
 The report shows prompt text only for this member's own prompts; other members show the session title.
+
+New work unit names (`token-ledger-out/units/`, `vocabulary.jsonl`) and rows from a manual collect are staged by the pre-commit hook and ride along with the next commit that has other changes. To share them right away, commit them directly: `git add token-ledger-out && git commit -m "chore: token-ledger names"`.
