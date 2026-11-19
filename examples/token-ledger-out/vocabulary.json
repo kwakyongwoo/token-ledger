@@ -1,0 +1,29 @@
+{
+ "report-filters": {
+  "aliases": [
+   "report-filter-ui"
+  ],
+  "added": "2026-11-10",
+  "new": false
+ },
+ "price-table": {
+  "aliases": [],
+  "added": "2026-11-10",
+  "new": false
+ },
+ "hook-install": {
+  "aliases": [],
+  "added": "2026-11-10",
+  "new": false
+ },
+ "vocab-command": {
+  "aliases": [],
+  "added": "2026-11-10",
+  "new": true
+ },
+ "onboarding-docs": {
+  "aliases": [],
+  "added": "2026-11-10",
+  "new": false
+ }
+}

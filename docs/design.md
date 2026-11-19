@@ -23,7 +23,7 @@ Main question it answers: which work costs the most (to change habits). Secondar
 ## Data flow
 
 1. **Source**: each member's local transcripts in `~/.claude/projects/*.jsonl` (already hold model, tokens, branch, cwd per response). No per-turn Claude hook.
-2. **Collect** (`pre-commit`): read prompts since the last collected point for this repo, dedupe responses by `requestId`, fold subagent transcripts into their parent prompt, append rows to the member's own file, and stage it in the same commit.
+2. **Collect** (`pre-commit`): read prompts since the last collected point for this repo, dedupe responses by `requestId`, fold subagent transcripts into their parent prompt, write the rows to a new chunk file, and stage it in the same commit. Only closed prompts are collected (a later prompt exists, or the session has been idle 30 minutes): the prompt that runs `git commit` is usually still running, so it waits for the next commit.
 3. **Cluster + name** (`report`): build a prompt graph, cluster it, name clusters, render `report.html`.
 
 ### Prompt unit
@@ -34,7 +34,7 @@ One user message until the next one, including tool calls and subagents. Injecte
 
 ```
 token-ledger-out/                 committed, shared
-├── data/<git user.name>.jsonl    one row per prompt, append-only, one writer each (no conflicts)
+├── data/<member>/<time>-<rand>.jsonl  one row per prompt; a new file per collect, never edited (no merge conflicts); readers dedupe by prompt id
 ├── vocabulary.json               work unit names + aliases
 ├── work-units.json               cluster membership + signatures
 ├── config.json                   {"classify": true, "per_member": true}
@@ -92,6 +92,8 @@ Repo `.claude/settings.json` lists the plugin and marketplace, so Claude Code of
 - Transcript format is undocumented; the reader must skip unknown lines and fields instead of failing.
 - Per-member stats can be personal data: tell the team before enabling; `per_member: false` hides the member view.
 - Prompts never followed by a commit stay out of team stats until the member's next commit in the repo.
+- Changed files come from Edit/Write tool calls only; edits made through Bash (sed, heredocs) are not seen, so file links are sparser than the real work.
+- Rows are attributed by each response's `cwd`, so a session that moves between repos splits correctly.
 - Licenses: own code MIT; networkx BSD-3; graspologic optional. No code is copied from other projects; if any is, add its license notice.
 - Do not present the plugin as affiliated with graphify or Anthropic. The README describes our own features only.
 - The repo is private for now; teammates need access until it is made public.
