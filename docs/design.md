@@ -22,8 +22,8 @@ Main question it answers: which work costs the most (to change habits). Secondar
 
 ## Data flow
 
-1. **Source**: each member's local transcripts in `~/.claude/projects/*.jsonl` (already hold model, tokens, branch, cwd per response). No per-turn Claude hook.
-2. **Collect** (`pre-commit`): read prompts since the last collected point for this repo, dedupe responses by `requestId`, fold subagent transcripts into their parent prompt, write the rows to a new chunk file, and stage it in the same commit. Only closed prompts are collected (a later prompt exists, or the session has been idle 30 minutes): the prompt that runs `git commit` is usually still running, so it waits for the next commit.
+1. **Source**: each member's local transcripts in `~/.claude/projects/*/*.jsonl` (already hold model, tokens, branch, cwd per response). No per-turn Claude hook.
+2. **Collect** (`pre-commit`): read prompts since the last collected point for this repo, dedupe responses by `requestId`, fold subagent transcripts into their parent prompt, write the rows to a new chunk file, and stage it in the same commit. Only closed prompts are collected (a later prompt exists; or the session file and its subagents have been idle 30 minutes and the last response ended the turn with `end_turn`; or they have been idle 24 hours): the prompt that runs `git commit` is usually still running, so it waits for the next commit.
 3. **Cluster + name** (`report`): build a prompt graph, cluster it, name clusters, render `report.html`.
 
 ### Prompt unit
@@ -45,7 +45,7 @@ token-ledger-out/                 committed, shared
 └── local.jsonl                   prompt excerpts (first 80 chars), for the member's own report only
 ```
 
-`.gitattributes`: `token-ledger-out/data/** linguist-generated` so PR diffs collapse it.
+`.gitattributes`: `token-ledger-out/data/**` and `token-ledger-out/units/**` are `linguist-generated`, so PR diffs collapse them.
 
 ### Shared row (no prompt text)
 
@@ -77,20 +77,20 @@ Flat (one level). New names are added automatically and flagged `new` in the rep
 
 Self-contained HTML, no server.
 
-- Filters: period, project, branch, worktree, tag, model, member.
-- Group by (mode switch): work unit, tag, session, branch, project, model, day, member.
+- Filters: period (days in the data), member, branch, worktree, tag, work unit, model.
+- Group by (mode switch): work unit, tag, session, branch, worktree, model, day, member.
 - Prompt list sorted by cost. Own prompts show excerpts; others do not.
 - Cost at API list prices, price table dated in the report.
 
 ## Teammate setup
 
-Repo `.claude/settings.json` lists the plugin and marketplace, so Claude Code offers to install it. The plugin's SessionStart hook installs the git hook when `token-ledger-out/` exists, appending to an existing `pre-commit` instead of replacing it, and says so in one line. The skill installs the CLI on first use if missing.
+Teammates install the plugin themselves (listing it in the repo's `.claude/settings.json` is a later option; `init` does not write it). On session start the plugin offers to install the CLI from its own folder when it is missing; once the CLI is there, it installs the git hook when `token-ledger-out/` exists, inserting its lines right after the shebang of an existing shell hook (non-shell hooks and tracked hook folders are left alone with a manual line to add), and says so in one line. `token-ledger hook uninstall` opts the member out.
 
 ## Constraints and risks
 
 - Prompt text never leaves the member's machine.
 - Transcript format is undocumented; the reader must skip unknown lines and fields instead of failing.
-- Per-member stats can be personal data: tell the team before enabling; `per_member: false` hides the member view.
+- Per-member stats can be personal data: tell the team before enabling. A `per_member: false` switch is reserved for hiding the member view (not implemented).
 - Prompts never followed by a commit stay out of team stats until the member's next commit in the repo.
 - Changed files come from Edit/Write tool calls only; edits made through Bash (sed, heredocs) are not seen, so file links are sparser than the real work.
 - Rows are attributed by each response's `cwd`, so a session that moves between repos splits correctly.

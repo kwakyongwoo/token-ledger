@@ -168,9 +168,11 @@ def add_subagents(session_path: Path, p: Prompt, in_repo) -> None:
     by_tool = {}
     for meta in sub_dir.glob("*.meta.json"):
         try:
-            by_tool[json.loads(meta.read_text()).get("toolUseId")] = meta
+            m = json.loads(meta.read_text())
         except (ValueError, OSError):
             continue
+        if isinstance(m, dict):
+            by_tool[m.get("toolUseId")] = meta
     queue = list(p.tool_use_ids)
     while queue:
         meta = by_tool.pop(queue.pop(), None)

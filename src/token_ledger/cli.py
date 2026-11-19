@@ -112,9 +112,11 @@ def cmd_tag(args) -> int:
     history = []
     for line in c._read_lines(path):
         try:
-            history.append(json.loads(line))
+            h = json.loads(line)
         except ValueError:
             continue
+        if isinstance(h, dict):
+            history.append(h)
     current = history[-1]["tag"] if history else None
     if args.name is None:
         print(f"current tag: {current or '(none)'}")
@@ -162,7 +164,7 @@ def main(argv=None) -> int:
     ap.add_argument("--version", action="version", version=__version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("collect", help="add closed prompts since the last run to a new chunk file")
-    p.add_argument("--stage", action="store_true", help="git add the new chunk (used by the pre-commit hook)")
+    p.add_argument("--stage", action="store_true", help="git add this member's chunks, unit assignments and the vocabulary (used by the pre-commit hook)")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--quiet", action="store_true", help="print nothing when there is nothing new")
     p.add_argument("--idle-minutes", type=float, default=30, help="treat a session's last prompt as closed after this")

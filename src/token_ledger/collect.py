@@ -136,9 +136,11 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> t
     tags = []
     for line in _read_lines(repo.state_dir / "tags.jsonl"):
         try:
-            tags.append(json.loads(line))
+            t = json.loads(line)
         except ValueError:
             continue
+        if isinstance(t, dict):
+            tags.append(t)
     rows, local = [], []
     files = state.setdefault("files", {})
     for path in sorted(transcripts.projects_dir().glob("*/*.jsonl")):
@@ -156,7 +158,11 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> t
         last_write = stat.st_mtime
         sub = path.parent / path.stem / "subagents"
         if sub.is_dir():
-            last_write = max([last_write, *(f.stat().st_mtime for f in sub.iterdir())])
+            for f in sub.iterdir():
+                try:
+                    last_write = max(last_write, f.stat().st_mtime)
+                except OSError:  # removed mid-scan
+                    continue
         quiet = now - last_write
         prompts, title, next_offset = transcripts.read_session(
             path, offset, repo.in_repo, idle=quiet > idle_minutes * 60, long_idle=quiet > 24 * 3600)
@@ -227,5 +233,6 @@ def read_all(root: Path) -> list[dict]:
                 r = json.loads(line)
             except ValueError:
                 continue
-            seen.setdefault(r.get("id"), r)
+            if isinstance(r, dict) and r.get("id"):
+                seen.setdefault(r["id"], r)
     return list(seen.values())

@@ -9,7 +9,7 @@ description: Set up token-ledger in the current git repo so the team's Claude Co
 2. Run `token-ledger init` at the repo root. It creates `token-ledger-out/config.json`, adds `.gitattributes` and `.gitignore` lines and a `## token-ledger` section to `CLAUDE.md`, and installs the pre-commit hook. It is safe to run again.
 3. Show the user what it printed, then explain in two lines:
    - Each commit adds rows for this member's finished prompts (usage, branch, tag, changed paths; never prompt text).
-   - Teammates get the hook automatically when they open the repo in Claude Code with this plugin.
+   - Teammates need the plugin; on their first session it offers to install the CLI and then the hook; after that the hook is checked on every session start.
 4. Suggest committing the new files. Do not commit unless asked.
 
 If the output says hooks live in a tracked folder (husky and similar), show the line it printed and ask the user to add it to that hook.

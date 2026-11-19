@@ -57,6 +57,8 @@ class Vocabulary:
 
     def merge(self, src: str, dst: str) -> str:
         src, dst = normalize(src), normalize(dst)
+        if not src or not dst:
+            return "names need letters or digits"
         if src not in self.entries:
             owner = self.resolve(src)
             return f"unknown name: {src}" if owner == src else f"{src} is already an alias of {owner}"
@@ -70,6 +72,8 @@ class Vocabulary:
 
     def rename(self, old: str, new: str) -> str:
         old, new = normalize(old), normalize(new)
+        if not new:
+            return "names need letters or digits"
         if old not in self.entries:
             return f"unknown name: {old}"
         if new in self.entries or self.resolve(new) != new:
@@ -101,7 +105,7 @@ def read_assignments(out_dir: Path) -> dict[str, str]:
             try:
                 r = json.loads(line)
                 ids.setdefault(r["id"], r["unit"])
-            except (ValueError, KeyError):
+            except (ValueError, KeyError, TypeError):
                 continue
     return ids
 
