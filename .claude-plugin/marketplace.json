@@ -1,0 +1,16 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "token-ledger",
+  "description": "Ledger of Claude Code token usage per prompt, feature, branch and worktree, grouped by model, feature and session.",
+  "owner": {
+    "name": "kwakyongwoo"
+  },
+  "plugins": [
+    {
+      "name": "token-ledger",
+      "description": "Ledger of Claude Code token usage per prompt, feature, branch and worktree, grouped by model, feature and session.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
