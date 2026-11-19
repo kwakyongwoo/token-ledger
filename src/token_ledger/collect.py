@@ -44,7 +44,22 @@ class Repo:
             if path == str(w) or path.startswith(str(w) + os.sep):
                 if best is None or len(str(w)) > len(str(best)):
                     best = w
+        if best is not None and path != str(best) and self._nested_repo(path, best):
+            return None
         return best
+
+    def _nested_repo(self, path: str, top: Path) -> bool:
+        """True when a submodule or another repo sits between path and the worktree root."""
+        cache = self.__dict__.setdefault("_nested", {})
+        if path not in cache:
+            p, found = Path(path), False
+            while p != top and top in p.parents:
+                if (p / ".git").exists():
+                    found = True
+                    break
+                p = p.parent
+            cache[path] = found
+        return cache[path]
 
     def in_repo(self, path: str | None) -> bool:
         return self.worktree_of(path) is not None
@@ -115,7 +130,15 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> t
     """Return (rows, local_rows, new_state) without writing anything."""
     now = time.time() if now is None else now
     state = _load(repo.state_dir / "state.json", {"files": {}})
-    tags = [json.loads(l) for l in _read_lines(repo.state_dir / "tags.jsonl")]
+    seen = [Path(w) for w in state.get("worktrees", [])]
+    repo.worktrees += [w for w in seen if w not in repo.worktrees]
+    state["worktrees"] = sorted(str(w) for w in repo.worktrees)
+    tags = []
+    for line in _read_lines(repo.state_dir / "tags.jsonl"):
+        try:
+            tags.append(json.loads(line))
+        except ValueError:
+            continue
     rows, local = [], []
     files = state.setdefault("files", {})
     for path in sorted(transcripts.projects_dir().glob("*/*.jsonl")):
@@ -130,8 +153,13 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> t
             offset = 0
         if offset == stat.st_size:
             continue
-        idle = now - stat.st_mtime > idle_minutes * 60
-        prompts, title, next_offset = transcripts.read_session(path, offset, repo.in_repo, closed_at_eof=idle)
+        last_write = stat.st_mtime
+        sub = path.parent / path.stem / "subagents"
+        if sub.is_dir():
+            last_write = max([last_write, *(f.stat().st_mtime for f in sub.iterdir())])
+        quiet = now - last_write
+        prompts, title, next_offset = transcripts.read_session(
+            path, offset, repo.in_repo, idle=quiet > idle_minutes * 60, long_idle=quiet > 24 * 3600)
         title = title or entry.get("title")
         for p in prompts:
             if not p.models:  # nothing in this repo
@@ -149,21 +177,42 @@ def _read_lines(path: Path):
         return []
 
 
+def stage_paths(repo: Repo, paths: list[Path]) -> None:
+    """git add, also into the real index during `git commit <paths>` (which commits from a temporary
+    next-index; without this the files show as deleted after the commit)."""
+    paths = [str(p) for p in paths if p.exists()]
+    if not paths:
+        return
+    git("add", "--", *paths, cwd=str(repo.root))
+    idx = os.environ.get("GIT_INDEX_FILE", "")
+    if os.path.basename(idx).startswith("next-index"):
+        real = os.path.join(os.path.dirname(idx), "index.lock")
+        if os.path.exists(real):
+            subprocess.run(["git", "add", "--", *paths], cwd=repo.root, check=True, capture_output=True,
+                           env=dict(os.environ, GIT_INDEX_FILE=real))
+
+
 def write(repo: Repo, rows: list[dict], local: list[dict], state: dict, stage: bool) -> Path | None:
-    """Write rows to a new chunk file (never edited again) and save local state."""
+    """Write rows to a new chunk file (never edited again) and save local state.
+
+    With stage, also stage this member's earlier chunks, unit assignments and the vocabulary, so
+    output of a manual `collect` or `report` reaches the team with the next commit.
+    """
     out = None
+    me = slug(repo.member)
     if rows:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out = repo.root / OUT_DIR / "data" / slug(repo.member) / f"{stamp}-{secrets.token_hex(3)}.jsonl"
+        out = repo.root / OUT_DIR / "data" / me / f"{stamp}-{secrets.token_hex(3)}.jsonl"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in rows))
-        if stage:
-            git("add", str(out), cwd=str(repo.root))
+    if stage:
+        base = repo.root / OUT_DIR
+        stage_paths(repo, [base / "data" / me, base / "units" / me, base / "vocabulary.jsonl"])
     repo.state_dir.mkdir(parents=True, exist_ok=True)
     if local:
         with open(repo.state_dir / "local.jsonl", "a") as f:
             f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in local)
-    tmp = repo.state_dir / "state.json.tmp"
+    tmp = repo.state_dir / f"state.json.{secrets.token_hex(4)}.tmp"
     tmp.write_text(json.dumps(state))
     tmp.replace(repo.state_dir / "state.json")
     return out
@@ -172,7 +221,7 @@ def write(repo: Repo, rows: list[dict], local: list[dict], state: dict, stage: b
 def read_all(root: Path) -> list[dict]:
     """Every shared row in the repo, deduplicated by prompt id."""
     seen = {}
-    for f in sorted((root / OUT_DIR / "data").glob("*/*.jsonl")):
+    for f in sorted((root / OUT_DIR / "data").glob("*/*.jsonl"), key=lambda f: (f.name, str(f))):
         for line in _read_lines(f):
             try:
                 r = json.loads(line)

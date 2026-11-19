@@ -37,7 +37,7 @@ def request_cost(model: str | None, usage: dict) -> float | None:
     write = usage.get("cache_creation_input_tokens") or 0
     split = usage.get("cache_creation") or {}
     w1h = split.get("ephemeral_1h_input_tokens") or 0
-    w5m = write - w1h if split else write  # no split: assume the 5-minute TTL
+    w5m = (split.get("ephemeral_5m_input_tokens") or 0) if split else write  # no split: assume the 5-minute TTL
     if (model or "").startswith("claude-haiku-5-5") and inp + read + write > 100_000:
         price = HAIKU_55_LONG
     p_in, p_out, p_read = price

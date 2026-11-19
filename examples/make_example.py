@@ -9,7 +9,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))
-from token_ledger import report  # noqa: E402
+from token_ledger import report, vocab  # noqa: E402
 from token_ledger.pricing import request_cost  # noqa: E402
 
 OUT = HERE / "token-ledger-out"
@@ -71,6 +71,7 @@ def main():
         if member == VIEWER:
             excerpts[pid] = rng.choice(texts)
 
+    by_id = {r["id"]: r for r in rows}
     for f in OUT.glob("data/*/*.jsonl"):
         f.unlink()
     for m in MEMBERS:  # one chunk per member and day, as collect would write them
@@ -79,10 +80,18 @@ def main():
             path = OUT / "data" / m.lower().replace(" ", "-") / f"{day.replace('-', '')}T200000Z-example.jsonl"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in chunk))
-    (OUT / "work-units.json").write_text(json.dumps(units, indent=1) + "\n")
-    vocab = {u: {"aliases": [], "added": "2026-11-10", "new": u in NEW} for u in UNITS}
-    vocab["report-filters"]["aliases"] = ["report-filter-ui"]
-    (OUT / "vocabulary.json").write_text(json.dumps(vocab, indent=1) + "\n")
+    for old in [OUT / "work-units.json", OUT / "vocabulary.json", *OUT.glob("units/*/*.jsonl")]:
+        old.unlink(missing_ok=True)
+    for m in MEMBERS:  # as if each member's report run assigned units to the prompts it found
+        mine = {pid: u for u, d in units.items() for pid in d["prompts"] if by_id[pid]["member"] == m}
+        path = OUT / "units" / m.lower().replace(" ", "-") / "20261119T200000Z-example.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(json.dumps({"id": i, "unit": u}) + "\n" for i, u in sorted(mine.items())))
+    v = vocab.Vocabulary(OUT)
+    for u in UNITS:
+        v.entries[u] = {"name": u, "aliases": [], "added": "2026-11-10", "new": u in NEW}
+    v.entries["report-filters"]["aliases"] = ["report-filter-ui"]
+    v.save()
     ids, new = report.load_units(OUT)
     (HERE / "report.html").write_text(report.build(rows, ids, new, excerpts, "example-repo"))
     print(f"{len(rows)} prompts, ${sum(r['cost'] for r in rows):.2f} -> {HERE / 'report.html'}")

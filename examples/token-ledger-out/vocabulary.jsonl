@@ -1,0 +1,5 @@
+{"added": "2026-11-10", "aliases": [], "name": "hook-install", "new": false}
+{"added": "2026-11-10", "aliases": [], "name": "onboarding-docs", "new": false}
+{"added": "2026-11-10", "aliases": [], "name": "price-table", "new": false}
+{"added": "2026-11-10", "aliases": ["report-filter-ui"], "name": "report-filters", "new": false}
+{"added": "2026-11-10", "aliases": [], "name": "vocab-command", "new": true}

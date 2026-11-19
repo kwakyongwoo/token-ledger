@@ -1,6 +1,6 @@
 # token-ledger design
 
-Status: agreed 2026-11-20, not built yet.
+Status: agreed 2026-11-20; v0.1.0 built. `per_member: false` is reserved and not implemented yet.
 
 ## Goal
 
@@ -35,8 +35,8 @@ One user message until the next one, including tool calls and subagents. Injecte
 ```
 token-ledger-out/                 committed, shared
 ├── data/<member>/<time>-<rand>.jsonl  one row per prompt; a new file per collect, never edited (no merge conflicts); readers dedupe by prompt id
-├── vocabulary.json               work unit names + aliases
-├── work-units.json               cluster membership + signatures
+├── units/<member>/<time>-<rand>.jsonl  {id, unit} assignments, write-once; the first assignment of a prompt wins
+├── vocabulary.jsonl              one work unit name per line (aliases, NEW flag), sorted so edits merge cleanly
 ├── config.json                   {"classify": true, "per_member": true}
 └── report.html                   gitignored, built locally
 .git/token-ledger/                local only, never tracked
@@ -58,7 +58,7 @@ Clustering is automatic and always on. Tags are separate: a human label, never a
 - **Edges between prompts**: same changed file (strong), adjacent in the same session (medium), same branch (weak).
 - **Algorithm**: networkx Louvain (required); graspologic Leiden when installed.
 - **Naming**: Haiku (`claude -p --model haiku`) names a cluster in 2-5 words from shared fields only (paths, branch, session title, tag), picking an existing vocabulary name first. Prompts with no changed files may use the local excerpt, so only the author's machine labels those.
-- **Stability**: a cluster whose membership signature matches a known one keeps its name; no model call.
+- **Stability**: a prompt keeps its first unit. A new cluster that contains already-named prompts takes their most common name; only clusters with no named prompt are sent to the model, in one batched call.
 - **Classify off** (`config.json` or `report --no-classify`): names come from the cluster's hub file, no model.
 
 ### Vocabulary
@@ -71,7 +71,7 @@ Flat (one level). New names are added automatically and flagged `new` in the rep
 
 ## Tags
 
-`/token-ledger:tag <name>` sticks to following prompts in this repo until `/token-ledger:tag off`. Names are normalized (lowercase, hyphens) and matched against vocabulary aliases; close existing names are suggested first.
+`/token-ledger:tag <name>` sticks to following prompts in this repo (all its worktrees) until `/token-ledger:tag off`. Names are normalized (lowercase, hyphens, dots kept) and close existing tags are suggested. Tags never feed clustering.
 
 ## Report
 

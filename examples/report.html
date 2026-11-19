@@ -64,7 +64,7 @@ function render(){const xs=recs.filter(keep),t=tot(xs);
   <td class="hide-sm">${esc(p.r.unit||"—")}<br><span class="muted">${esc(p.r.branch||"")}${p.r.tag?" · #"+esc(p.r.tag):""}</span></td>
   <td class="n">${usd(p.cost)}<br><span class="muted">${esc(p.models.join(", "))}</span></td></tr>`).join("");}
 function setup(){const f=$("filters");
- const days=[...new Set(recs.map(x=>x.day))].sort(),dayOpts=days.map(d=>`<option>${d}</option>`).join("");
+ const days=[...new Set(recs.map(x=>x.day))].sort(),dayOpts=days.map(d=>`<option>${esc(d)}</option>`).join("");
  f.innerHTML=`<label>From<select id="from"><option value="">Any</option>${dayOpts}</select></label><label>To<select id="to"><option value="">Any</option>${dayOpts}</select></label>`+FILTERS.map(k=>{
   const vs=[...new Set(recs.map(x=>String(val(x,k)??"(none)")))].sort();
   return `<label>${FIELDS[k]}<select data-k="${k}"><option value="">All</option>${vs.map(v=>`<option>${esc(v)}</option>`).join("")}</select></label>`}).join("");

@@ -5,7 +5,10 @@ description = "Per-prompt Claude Code token usage ledger, shared through git."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["networkx>=3.1"]
+
+[project.optional-dependencies]
+leiden = ["graspologic"]
 
 [project.scripts]
 token-ledger = "token_ledger.cli:main"

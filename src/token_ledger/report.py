@@ -8,19 +8,12 @@ from .pricing import PRICES_DATE
 
 
 def load_units(out_dir: Path) -> tuple[dict, set]:
-    """work-units.json -> ({prompt id: unit name}, {names flagged new in vocabulary.json})."""
-    ids, new = {}, set()
-    try:
-        for name, unit in json.loads((out_dir / "work-units.json").read_text()).items():
-            for pid in unit.get("prompts", []):
-                ids[pid] = name
-    except (OSError, ValueError):
-        pass
-    try:
-        new = {n for n, v in json.loads((out_dir / "vocabulary.json").read_text()).items() if v.get("new")}
-    except (OSError, ValueError):
-        pass
-    return ids, new
+    """({prompt id: canonical unit name}, {names flagged NEW}) from units/ and vocabulary.jsonl."""
+    from .vocab import Vocabulary, read_assignments
+
+    v = Vocabulary(out_dir)
+    ids = {i: v.resolve(u) for i, u in read_assignments(out_dir).items()}
+    return ids, {n for n, e in v.entries.items() if e.get("new")}
 
 
 def build(rows: list[dict], units: dict, new_units: set, excerpts: dict, title: str) -> str:
@@ -33,7 +26,7 @@ def build(rows: list[dict], units: dict, new_units: set, excerpts: dict, title: 
             "files": r.get("files", []), "excerpt": excerpts.get(r["id"]),
         })
     payload = json.dumps({"rows": data, "newUnits": sorted(new_units), "pricesDate": PRICES_DATE, "title": title},
-                         ensure_ascii=False).replace("</", "<\\/")
+                         ensure_ascii=False).replace("<", "\\u003c")  # no "</script>" or "<!--" can end the script
     return TEMPLATE.replace("__DATA__", payload).replace("__TITLE__", _esc(title))
 
 
@@ -107,7 +100,7 @@ function render(){const xs=recs.filter(keep),t=tot(xs);
   <td class="hide-sm">${esc(p.r.unit||"—")}<br><span class="muted">${esc(p.r.branch||"")}${p.r.tag?" · #"+esc(p.r.tag):""}</span></td>
   <td class="n">${usd(p.cost)}<br><span class="muted">${esc(p.models.join(", "))}</span></td></tr>`).join("");}
 function setup(){const f=$("filters");
- const days=[...new Set(recs.map(x=>x.day))].sort(),dayOpts=days.map(d=>`<option>${d}</option>`).join("");
+ const days=[...new Set(recs.map(x=>x.day))].sort(),dayOpts=days.map(d=>`<option>${esc(d)}</option>`).join("");
  f.innerHTML=`<label>From<select id="from"><option value="">Any</option>${dayOpts}</select></label><label>To<select id="to"><option value="">Any</option>${dayOpts}</select></label>`+FILTERS.map(k=>{
   const vs=[...new Set(recs.map(x=>String(val(x,k)??"(none)")))].sort();
   return `<label>${FIELDS[k]}<select data-k="${k}"><option value="">All</option>${vs.map(v=>`<option>${esc(v)}</option>`).join("")}</select></label>`}).join("");

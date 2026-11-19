@@ -20,9 +20,10 @@ def human(uuid, ts, text, cwd, idx):
             "origin": {"kind": "human"}, "turnPosition": {"promptIndex": idx}, "message": {"role": "user", "content": text}}
 
 
-def assistant(rid, ts, cwd, usage, content=None, model=OPUS):
+def assistant(rid, ts, cwd, usage, content=None, model=OPUS, stop="end_turn"):
     return {"type": "assistant", "requestId": rid, "timestamp": ts, "cwd": cwd, "gitBranch": "feat/x", "sessionId": "s1",
-            "message": {"model": model, "usage": usage, "content": content or [{"type": "text", "text": "ok"}]}}
+            "message": {"model": model, "usage": usage, "stop_reason": stop,
+                        "content": content or [{"type": "text", "text": "ok"}]}}
 
 
 U = {"input_tokens": 10, "output_tokens": 100, "cache_read_input_tokens": 1000, "cache_creation_input_tokens": 200,
@@ -66,9 +67,9 @@ class CollectTest(unittest.TestCase):
         (sub / "agent-a1.meta.json").write_text(json.dumps({"toolUseId": "tu-agent"}))
         (sub / "agent-a1.jsonl").write_text(json.dumps(dict(assistant("r9", "2026-11-20T00:00:20Z", r, U), isSidechain=True)) + "\n")
 
-    def run_collect(self, idle):
+    def run_collect(self, idle, seconds=10_000):
         repo = c.Repo(cwd=str(self.repo))
-        now = time.time() + (10_000 if idle else 0)
+        now = time.time() + (seconds if idle else 0)
         rows, local, state = c.collect(repo, idle_minutes=30, now=now)
         out = c.write(repo, rows, local, state, stage=False)
         return rows, out
@@ -101,6 +102,32 @@ class CollectTest(unittest.TestCase):
         self.assertNotEqual(out, out3)  # each run writes its own file
         self.assertEqual(sorted(r["id"] for r in c.read_all(Path(self.root))), ["p1", "p3"])
 
+    def test_idle_needs_end_turn_and_odd_lines_are_skipped(self):
+        with open(self.session, "a") as f:
+            f.write("[]\nnull\n")  # valid JSON, not objects
+            f.write(json.dumps(human("p4", "2026-11-20T00:03:00Z", "waiting on a tool", self.root, 4)) + "\n")
+            f.write(json.dumps(assistant("r5", "2026-11-20T00:03:05Z", self.root, U, stop="tool_use")) + "\n")
+        ids = [r["id"] for r in self.run_collect(idle=True)[0]]
+        self.assertEqual(ids, ["p1", "p3"])  # p4 is idle but mid-tool: still open
+        ids = [r["id"] for r in self.run_collect(idle=True, seconds=2 * 86400)[0]]
+        self.assertEqual(ids, ["p4"])  # a day later it is closed anyway
+
+    def test_removed_worktree_and_nested_repo(self):
+        gone = self.tmp / "gone-worktree"
+        nested = Path(self.root) / "vendor" / "lib"
+        (nested / ".git").mkdir(parents=True)
+        with open(self.session, "a") as f:
+            f.write(json.dumps(human("w1", "2026-11-20T00:03:00Z", "in a worktree", str(gone), 4)) + "\n")
+            f.write(json.dumps(assistant("rw", "2026-11-20T00:03:05Z", str(gone), U)) + "\n")
+            f.write(json.dumps(human("n1", "2026-11-20T00:04:00Z", "in a nested repo", str(nested), 5)) + "\n")
+            f.write(json.dumps(assistant("rn", "2026-11-20T00:04:05Z", str(nested), U)) + "\n")
+        repo = c.Repo(cwd=str(self.repo))
+        repo.state_dir.mkdir(parents=True, exist_ok=True)
+        (repo.state_dir / "state.json").write_text(json.dumps({"files": {}, "worktrees": [str(gone)]}))
+        ids = [r["id"] for r in self.run_collect(idle=True)[0]]
+        self.assertIn("w1", ids)  # remembered worktree still counts after removal
+        self.assertNotIn("n1", ids)  # belongs to the nested repo
+
     def test_pricing(self):
         # opus 5.5: 10*4 + 100*20 + 1000*0.2 + 200*4*1.25 per MTok
         self.assertAlmostEqual(request_cost(OPUS, U), (40 + 2000 + 200 + 1000) / 1e6)
@@ -108,6 +135,8 @@ class CollectTest(unittest.TestCase):
         long = {"input_tokens": 150_000, "output_tokens": 0}
         self.assertAlmostEqual(request_cost("claude-haiku-5-5", long), 150_000 * 0.5 / 1e6)
         self.assertIsNone(request_cost("claude-unknown-9", U))
+        no_total = {"output_tokens": 0, "cache_creation": {"ephemeral_1h_input_tokens": 100}}
+        self.assertGreaterEqual(request_cost(OPUS, no_total), 0)
         one_hour = dict(U, cache_creation={"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 200})
         self.assertAlmostEqual(request_cost(OPUS, one_hour) - request_cost(OPUS, U), 200 * 4 * (2 - 1.25) / 1e6)
 

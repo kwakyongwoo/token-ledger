@@ -85,6 +85,7 @@ class Prompt:
     files: set = field(default_factory=set)  # absolute paths
     subagents: int = 0
     seen_requests: set = field(default_factory=set)
+    last_stop: str | None = None  # stop_reason of the latest main-thread response
 
     def add_assistant(self, d: dict, in_repo) -> None:
         msg = d.get("message") or {}
@@ -122,15 +123,19 @@ def _lines(path: Path, offset: int):
                 return
             start, pos = pos, pos + len(raw)
             try:
-                yield start, pos, json.loads(raw)
+                d = json.loads(raw)
             except ValueError:
                 continue
+            if isinstance(d, dict):
+                yield start, pos, d
 
 
-def read_session(path: Path, offset: int, in_repo, closed_at_eof: bool):
+def read_session(path: Path, offset: int, in_repo, idle: bool, long_idle: bool):
     """Prompts from offset on. Returns (closed_prompts, title, next_offset).
 
-    next_offset points at the first prompt still open, so it is read again next time.
+    The last prompt counts as closed only when the session is idle and its last response ended the
+    turn (or the session has been idle for a very long time, e.g. after an interrupt). next_offset
+    points at the first prompt still open, so it is read again next time.
     """
     prompts: list[tuple[int, Prompt]] = []
     title = None
@@ -144,7 +149,9 @@ def read_session(path: Path, offset: int, in_repo, closed_at_eof: bool):
             prompts.append((start, Prompt(pid, d.get("sessionId", path.stem), d.get("timestamp", ""), excerpt(d))))
         elif t == "assistant" and prompts and not d.get("isSidechain"):
             prompts[-1][1].add_assistant(d, in_repo)
+            prompts[-1][1].last_stop = (d.get("message") or {}).get("stop_reason") or prompts[-1][1].last_stop
     next_offset = end  # just past the last complete line
+    closed_at_eof = long_idle or (idle and bool(prompts) and prompts[-1][1].last_stop == "end_turn")
     if prompts and not closed_at_eof:
         next_offset = prompts[-1][0]
         prompts = prompts[:-1]
