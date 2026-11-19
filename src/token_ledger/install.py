@@ -125,8 +125,9 @@ def init(repo: Repo) -> list[str]:
     if not cfg.exists():
         cfg.write_text(json.dumps({"classify": True, "per_member": True}, indent=2) + "\n")
         done.append(f"created {OUT_DIR}/config.json")
-    if _append_line(repo.root / ".gitattributes", f"{OUT_DIR}/data/** linguist-generated"):
-        done.append(".gitattributes: data marked as generated (collapsed in PR diffs)")
+    added = [_append_line(repo.root / ".gitattributes", f"{OUT_DIR}/{d}/** linguist-generated") for d in ("data", "units")]
+    if any(added):
+        done.append(".gitattributes: data and units marked as generated (collapsed in PR diffs)")
     if _append_line(repo.root / ".gitignore", f"{OUT_DIR}/report.html"):
         done.append(".gitignore: report.html is built locally")
     claude = repo.root / "CLAUDE.md"
