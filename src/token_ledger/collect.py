@@ -78,13 +78,25 @@ def _load(path: Path, default):
         return default
 
 
-def active_tag(tags: list[dict], ts: str) -> str | None:
-    """Tag switched on most recently at or before ts (tags.jsonl rows: {"ts", "tag"}; tag null = off)."""
-    tag = None
-    for row in tags:
-        if row.get("ts", "") <= ts:
-            tag = row.get("tag")
-    return tag
+def active_tag(tags: list[dict], ts: str, branch: str | None = None) -> str | None:
+    """Tag switched on most recently at or before ts (tags.jsonl rows: {"ts", "tag", "branch"}; tag null = off).
+
+    A tag set on a branch applies only to prompts on that branch, so it stops when you switch branches
+    and resumes when you come back. Rows without a branch (0.2.0 and earlier, detached HEAD) apply everywhere.
+    """
+    row = None
+    for r in tags:  # latest switch made on this branch (or with no branch); other branches' switches don't count
+        if r.get("ts", "") <= ts and (not branch or not r.get("branch") or r["branch"] == branch):
+            row = r
+    return row.get("tag") if row else None
+
+
+def current_branch(cwd: str | None = None) -> str | None:
+    try:
+        b = git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
+    except subprocess.CalledProcessError:
+        return None
+    return None if b == "HEAD" else b
 
 
 def to_row(p: transcripts.Prompt, repo: Repo, title: str | None, tag: str | None) -> dict:
@@ -170,7 +182,7 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None,
         for p in prompts:
             if not p.models:  # nothing in this repo
                 continue
-            rows.append(to_row(p, repo, title, active_tag(tags, p.ts)))
+            rows.append(to_row(p, repo, title, active_tag(tags, p.ts, p.branch)))
             local.append({"id": p.id, "excerpt": p.excerpt})
         files[key] = {"offset": next_offset, "title": title}
     if rebuild:

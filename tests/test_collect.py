@@ -169,6 +169,38 @@ class CollectTest(unittest.TestCase):
         old = next(r for r in c.read_all(Path(self.root)) if r["id"] == "old")
         self.assertAlmostEqual(old["cost"], rows["p4"]["cost"], places=5)
 
+    def test_tag_follows_branch(self):
+        tags = [{"ts": "2026-11-20T00:00:00Z", "tag": "exp", "branch": "feat/x"},
+                {"ts": "2026-11-20T02:00:00Z", "tag": None, "branch": "feat/x"}]
+        at = lambda ts, b: c.active_tag(tags, ts, b)
+        self.assertEqual(at("2026-11-20T01:00:00Z", "feat/x"), "exp")
+        self.assertIsNone(at("2026-11-20T01:00:00Z", "main"))  # other branch: not tagged
+        self.assertIsNone(at("2026-11-20T03:00:00Z", "feat/x"))  # turned off
+        self.assertEqual(c.active_tag([{"ts": "2026-11-20T00:00:00Z", "tag": "old"}], "2026-11-21T00:00:00Z", "main"),
+                         "old")  # rows from 0.2.0 have no branch and apply everywhere
+        tags.append({"ts": "2026-11-20T00:30:00Z", "tag": "other", "branch": "main"})
+        self.assertEqual(at("2026-11-20T01:00:00Z", "feat/x"), "exp")  # a switch on main leaves feat/x alone
+        self.assertEqual(at("2026-11-20T01:00:00Z", "main"), "other")
+        # the CLI records the branch, and --notice speaks only on that branch
+        from token_ledger import cli
+        import contextlib, io
+        def run(*argv):
+            out = io.StringIO()
+            cwd = os.getcwd()
+            os.chdir(self.repo)
+            try:
+                with contextlib.redirect_stdout(out):
+                    cli.main(list(argv))
+            finally:
+                os.chdir(cwd)
+            return out.getvalue()
+        g = lambda *a: subprocess.run(["git", *a], cwd=self.repo, check=True, capture_output=True)
+        self.assertIn("(branch main)", run("tag", "Exp 1"))
+        self.assertIn("'exp-1'", run("tag", "--notice"))
+        g("checkout", "-q", "-b", "other")
+        self.assertEqual(run("tag", "--notice"), "")
+        self.assertIn("is on for branch main", run("tag"))
+
     def test_pricing(self):
         # opus 5.5: 10*4 + 100*20 + 1000*0.2 + 200*4*1.25 per MTok
         self.assertAlmostEqual(request_cost(OPUS, U), (40 + 2000 + 200 + 1000) / 1e6)

@@ -20,4 +20,5 @@ case "$(token-ledger hook status 2>/dev/null)" in
   manual)
     echo "token-ledger: the pre-commit hook was not installed because this repo's hooks live in a tracked folder or the existing hook is not a shell script. If the user wants usage recorded, show them the output of: token-ledger hook install" ;;
 esac
+token-ledger tag --notice 2>/dev/null
 exit 0

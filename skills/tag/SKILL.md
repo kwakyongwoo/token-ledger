@@ -5,7 +5,8 @@ description: Label the following prompts in this repo with a tag (a human label 
 
 # tag
 
-- `token-ledger tag <name>` starts a tag; it applies to every following prompt in this repo until changed.
+- `token-ledger tag <name>` starts a tag on the current branch. It applies to following prompts on that branch until changed: switching to another branch pauses it, coming back resumes it.
 - `token-ledger tag off` stops tagging. `token-ledger tag` with no name shows the current tag.
+- When a session starts on a branch with an active tag, the plugin's SessionStart hook says so; mention it once to the user.
 
 The CLI normalizes the name (lowercase, hyphens, dots kept) and records it right away. If it prints similar existing tags, tell the user; if they meant one of those, run `token-ledger tag <that name>` (the later switch wins for following prompts).

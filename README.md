@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
+  <img src="https://img.shields.io/badge/version-0.3.0-111111?style=flat-square" alt="Version 0.3.0">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
@@ -123,7 +123,7 @@ Set `"classify": false` to skip the model completely.
 |---|---|---|
 | `/token-ledger:init` | `token-ledger init` | Turns token-ledger on in this repo |
 | `/token-ledger:report` | `token-ledger report` | Groups new prompts, then writes `token-ledger-out/report.html` |
-| `/token-ledger:tag <name>` | `token-ledger tag <name>` | Tags the prompts that follow (`off` to stop) |
+| `/token-ledger:tag <name>` | `token-ledger tag <name>` | Tags the prompts that follow on the current branch (`off` to stop). Claude reminds you of an active tag when a session starts |
 | `/token-ledger:vocab` | `token-ledger vocab list\|merge\|rename\|ok` | Merges, renames and confirms work unit names |
 | | `token-ledger summary --by branch` | Quick totals in the terminal |
 | | `token-ledger doctor` | Checks the setup, missing rows and transcript format changes |
@@ -171,7 +171,7 @@ If it is a shell script, token-ledger adds one line to it and never blocks the c
 
 ## Status
 
-v0.2.0, early. The data format may change before 1.0. Format and compatibility rules: [`docs/format.md`](docs/format.md). Design notes: [`docs/design.md`](docs/design.md).
+v0.3.0, early. The data format may change before 1.0. Format and compatibility rules: [`docs/format.md`](docs/format.md). Design notes: [`docs/design.md`](docs/design.md).
 
 ## License
 

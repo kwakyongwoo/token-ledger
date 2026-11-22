@@ -1,6 +1,6 @@
 {
   "name": "token-ledger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Ledger of Claude Code token usage per prompt, feature, branch and worktree, grouped by model, feature and session.",
   "author": {
     "name": "kwakyongwoo",

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
+  <img src="https://img.shields.io/badge/version-0.3.0-111111?style=flat-square" alt="Version 0.3.0">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
@@ -123,7 +123,7 @@ token-ledger report ──> 작업 단위로 묶기 ──> 새 단위 이름 �
 |---|---|---|
 | `/token-ledger:init` | `token-ledger init` | 이 레포에서 token-ledger를 켭니다 |
 | `/token-ledger:report` | `token-ledger report` | 새 프롬프트를 묶은 뒤 `token-ledger-out/report.html`을 만듭니다 |
-| `/token-ledger:tag <name>` | `token-ledger tag <name>` | 이후 프롬프트에 태그를 붙입니다 (`off`로 끔) |
+| `/token-ledger:tag <name>` | `token-ledger tag <name>` | 현재 브랜치의 이후 프롬프트에 태그를 붙입니다 (`off`로 끔). 세션을 시작할 때 켜진 태그를 알려줍니다 |
 | `/token-ledger:vocab` | `token-ledger vocab list\|merge\|rename\|ok` | 작업 단위 이름을 합치고, 바꾸고, 확인 처리합니다 |
 | | `token-ledger summary --by branch` | 터미널에서 간단히 합계를 봅니다 |
 | | `token-ledger doctor` | 설정, 빠진 기록, 대화 기록 형식 변경을 점검합니다 |
@@ -171,7 +171,7 @@ API 정가(2026-11-03 확인) 기준 추정치입니다. 구독 요금제라면 
 
 ## 상태
 
-v0.2.0, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 형식과 호환 규칙: [`docs/format.md`](docs/format.md). 설계 노트: [`docs/design.md`](docs/design.md).
+v0.3.0, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 형식과 호환 규칙: [`docs/format.md`](docs/format.md). 설계 노트: [`docs/design.md`](docs/design.md).
 
 ## 라이선스
 

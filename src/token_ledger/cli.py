@@ -121,9 +121,24 @@ def cmd_tag(args) -> int:
             continue
         if isinstance(h, dict):
             history.append(h)
-    current = history[-1].get("tag") if history else None
+    branch = c.current_branch()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    current = c.active_tag(history, now, branch)
+    if args.notice:  # for the SessionStart hook: one line only when a tag applies here
+        if current:
+            where = f"on branch {branch}" if branch else "in this repo"
+            print(f"token-ledger: prompts {where} are tagged '{current}'. Mention this once to the user; "
+                  "they can stop it with /token-ledger:tag off.")
+        return 0
     if args.name is None:
         print(f"current tag: {current or '(none)'}")
+        others = {}
+        for h in history:
+            if h.get("branch") and h["branch"] != branch:
+                others[h["branch"]] = h.get("tag")
+        for b, t in sorted(others.items()):
+            if t:
+                print(f"('{t}' is on for branch {b})")
         return 0
     tag = None if args.name.lower() == "off" else re.sub(r"[^a-z0-9.]+", "-", args.name.lower()).strip("-.")[:40]
     if args.name.lower() != "off" and not tag:
@@ -132,8 +147,9 @@ def cmd_tag(args) -> int:
     known = {h["tag"] for h in history if h.get("tag")} | {r.get("tag") for r in c.read_all(repo.root) if r.get("tag")}
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as f:
-        f.write(json.dumps({"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"), "tag": tag}) + "\n")
-    print(f"tag: {tag}" if tag else "tag off")
+        f.write(json.dumps({"ts": now, "tag": tag, "branch": branch}) + "\n")
+    scope = f"branch {branch}" if branch else "every branch: no branch is checked out"
+    print(f"tag: {tag} ({scope})" if tag else f"tag off ({scope})")
     words = set((tag or "").split("-"))
     close = sorted(t for t in known if t != tag and words & set(t.split("-")))
     if close:
@@ -240,6 +256,7 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_report)
     p = sub.add_parser("tag", help="tag the following prompts in this repo (off to stop, no name to show)")
     p.add_argument("name", nargs="?")
+    p.add_argument("--notice", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_tag)
     p = sub.add_parser("vocab", help="list, merge, rename work unit names or clear NEW flags")
     p.add_argument("action", choices=["list", "merge", "rename", "ok"])

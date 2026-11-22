@@ -80,5 +80,5 @@ These files live in `.git/token-ledger/` and are shared by all worktrees of the 
 |---|---|
 | `state.json` | Read offset per transcript, known worktrees |
 | `local.jsonl` | Short prompt excerpts for this member's report |
-| `tags.jsonl` | Tag history |
+| `tags.jsonl` | Tag history: `{"ts", "tag", "branch"}` per switch. Since 0.3.0 a tag applies only to prompts on its `branch`; rows without one apply everywhere |
 | `hook-disabled` | Present if this member opted out |
