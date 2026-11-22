@@ -171,7 +171,7 @@ If it is a shell script, token-ledger adds one line to it and never blocks the c
 
 ## Status
 
-v0.2.0, early. The data format may change before 1.0. Design notes: [`docs/design.md`](docs/design.md).
+v0.2.0, early. The data format may change before 1.0. Format and compatibility rules: [`docs/format.md`](docs/format.md). Design notes: [`docs/design.md`](docs/design.md).
 
 ## License
 
