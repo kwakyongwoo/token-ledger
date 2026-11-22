@@ -1,54 +1,176 @@
-# token-ledger
+<h1 align="center">token-ledger</h1>
 
-[English](README.md) | 한국어
+<p align="center">
+  <em>팀의 Claude Code 토큰은 어디에 쓰였을까? 프롬프트별, 기능별, 브랜치별로 확인하세요.</em>
+</p>
 
-Claude Code 토큰 사용량을 질문, 기능, 브랜치, 워크트리 단위로 기록하고 모델별, 기능별, 세션별로 묶어 보여주는 장부.
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.1.0-111111?style=flat-square" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
+  <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
+</p>
 
-## 예시
+<p align="center">
+  <a href="README.md">English</a> · <b>한국어</b>
+</p>
 
-![예시 리포트](examples/screenshot-light.jpg)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="examples/screenshot-dark.jpg">
+    <img src="examples/screenshot-light.jpg" alt="token-ledger 리포트: 작업 단위별 비용과 필터" width="820">
+  </picture>
+</p>
 
-가상의 데이터(가상의 팀원 세 명, 프롬프트 140개)로 만든 리포트. [`examples/report.html`](examples/report.html)을 브라우저로 열면 필터와 묶기 버튼을 써볼 수 있고, [`examples/token-ledger-out/`](examples/token-ledger-out/)에서 실제로 커밋되는 것(프롬프트 원문 없는 기록, 작업 단위, 단어장)을 볼 수 있다. 다시 만들려면 `python3 examples/make_example.py`.
+token-ledger는 git 레포에서 쓰인 모든 Claude Code 프롬프트의 토큰 사용량을 팀원 모두에 대해 기록합니다. 기록은 git으로 공유되므로 모든 팀원이 같은 숫자를 봅니다. 그다음 프롬프트를 `report-filters`, `pricing-fix` 같은 작업 단위로 묶고, 필터와 그룹 기준을 바꿔 볼 수 있는 HTML 리포트를 만듭니다.
 
-## 설치
+- **새 습관이 필요 없습니다.** 기록은 pre-commit hook이 추가합니다. 평소처럼 작업하고 커밋하면 됩니다.
+- **git에 프롬프트 내용이 없습니다.** 커밋되는 기록에는 숫자, 브랜치, 태그, 바뀐 파일 경로만 들어갑니다.
+- **기능 단위로 묶입니다.** 같은 파일을 고친 프롬프트는 같은 작업 단위가 됩니다. 각 단위의 한 줄 이름은 Claude Haiku가 짓고, 모델을 끄면 파일 이름에서 가져옵니다.
+- **이름을 공유합니다.** 단어장 파일 덕분에 단위 이름이 팀 전체에서, 실행할 때마다 같게 유지됩니다.
+- **직접 붙이는 라벨도 있습니다.** 태그로 릴리스나 실험을 표시할 수 있고, 자동 묶음과는 따로 동작합니다.
+
+## 빠른 시작
+
+**1. Claude Code에서 플러그인을 설치합니다:**
 
 ```
 /plugin marketplace add kwakyongwoo/token-ledger
 /plugin install token-ledger@token-ledger
 ```
 
-## 사용법
+**2. CLI를 설치합니다** ([`uv`](https://docs.astral.sh/uv/) 필요). 이 단계를 건너뛰면, token-ledger를 쓰는 레포를 처음 열 때 Claude가 대신 설치해 주겠다고 제안합니다.
 
-[`uv`](https://docs.astral.sh/uv/)와 git이 필요하다. `token-ledger` CLI는 플러그인이 필요할 때 자기 폴더에서 설치한다.
+```bash
+uv tool install git+https://github.com/kwakyongwoo/token-ledger
+```
 
-**레포 설정 (한 사람이 한 번)**
+**3. 레포에서 켭니다** (한 사람이 한 번만). 그다음 새로 생긴 파일을 커밋합니다:
 
 ```
 /token-ledger:init
 ```
 
-`token-ledger-out/`을 만들고, `.gitattributes`에 데이터를 생성 파일로 표시하고, 로컬 리포트를 무시하도록 하고, `CLAUDE.md`에 `## token-ledger` 섹션을 넣고, pre-commit hook을 설치한다. 새로 생긴 파일을 커밋한다.
+**4. 평소처럼 작업하고 커밋합니다.** 나중에 리포트를 엽니다:
 
-**팀원**은 플러그인을 설치하고 Claude Code로 레포를 열면 된다. SessionStart hook이 CLI 설치를 안내하고 pre-commit hook을 설치한다.
+```
+/token-ledger:report
+```
 
-**커밋할 때마다** `token-ledger-out/data/<팀원>/` 아래에 새 파일이 하나 생긴다. 이 레포에서 끝난 프롬프트마다 한 줄씩, 모델별 토큰, API 정가 기준 비용, 브랜치, 워크트리, 태그, 바뀐 파일 경로가 들어간다. 프롬프트 원문은 커밋되지 않는다. (예외 하나: 파일을 고치지 않은 내 프롬프트만으로 된 작업 단위는 그 프롬프트 앞부분을 보고 이름을 붙이므로, 이름에 질문 내용이 드러날 수 있다.) 커밋하는 순간 아직 진행 중인 프롬프트는 다음 커밋에 들어간다.
+팀원은 1단계와 2단계만 하면 됩니다. 레포를 열면 SessionStart hook이 pre-commit hook을 대신 설치합니다.
 
-**명령**
+## 예시 보기
+
+[`examples/report.html`](examples/report.html)은 가상 데이터(팀원 3명, 프롬프트 140개)로 만든 전체 리포트입니다. 브라우저에서 열어 필터와 그룹 기준 버튼을 눌러 보세요. [`examples/token-ledger-out/`](examples/token-ledger-out/)에서 실제로 커밋되는 내용을 볼 수 있습니다. 다시 만들려면 `python3 examples/make_example.py`를 실행하세요.
+
+## 리포트에서 볼 수 있는 것
+
+| | |
+|---|---|
+| **요약 카드** | 비용, 프롬프트 수, 입력, 출력, 프롬프트당 비용 |
+| **필터** | 기간, 팀원, 브랜치, 워크트리, 태그, 작업 단위, 모델 |
+| **그룹 기준** | 작업 단위, 태그, 세션, 브랜치, 워크트리, 모델, 날짜, 팀원 |
+| **비용이 큰 프롬프트** | 상위 25개. 짧은 발췌는 내 프롬프트에만 표시 |
+| **라이트·다크** | 시스템 테마를 따름 |
+
+커밋되는 기록 한 줄에는 다음이 들어갑니다:
+- 모델별 토큰: 입력, 출력, 캐시 쓰기, 캐시 읽기, thinking
+- API 정가 기준 비용
+- 걸린 시간
+- 도구 호출과 서브에이전트 수
+- 브랜치, 워크트리, 태그
+- 세션 제목과 수정한 파일의 레포 기준 경로
+
+## 동작 방식
+
+```
+Claude Code 세션 ──> ~/.claude/projects/*.jsonl   (로컬 대화 기록)
+                                        │
+git commit ──> pre-commit hook ──> token-ledger collect
+                                        │  끝난 프롬프트만, 프롬프트 내용 제외
+                                        ▼
+                    token-ledger-out/data/<member>/<time>-<id>.jsonl   (커밋됨, 한 번 쓰고 수정 안 함)
+                                        │
+token-ledger report ──> 작업 단위로 묶기 ──> 새 단위 이름 짓기(Haiku) ──> report.html
+```
+
+1. **수집.** 커밋할 때마다 hook이 로컬 대화 기록에서 아직 읽지 않은 부분만 읽습니다. 이 레포를 건드렸고 끝난 프롬프트만 남깁니다. 다음 프롬프트가 있거나, 정상 응답 뒤 세션이 30분 동안 조용하면 끝난 것으로 봅니다.
+2. **공유.** 실행할 때마다 새 파일을 쓰고, 그 파일은 다시 수정하지 않습니다. 두 사람이 동시에 커밋해도 충돌이 나지 않습니다.
+3. **묶기.** 다음 경우에 프롬프트끼리 연결됩니다:
+   - 같은 파일을 고친 경우 (가장 강하게)
+   - 한 세션에서 연달아 나온 경우
+   - 같은 기능 브랜치인 경우
+
+   그다음 Louvain 커뮤니티 탐지로 묶음을 찾습니다.
+4. **이름 짓기.** `claude -p --model haiku` 한 번으로 새 묶음 전부에 이름을 붙입니다. 프롬프트 내용이 아니라 파일 경로, 브랜치, 세션 제목을 보냅니다. 이미 이름이 있는 묶음은 그 이름을 그대로 씁니다.
+
+## 비용과 속도
+
+대화 기록이 192 MB인 실제 레포에서 측정했습니다:
+
+| 언제 | 추가 시간 | 토큰 |
+|---|---|---|
+| 커밋할 때마다 | 약 0.2초 (처음 한 번은 1.5초) | 0 |
+| Claude Code를 열 때 | 약 0.2초 | 0 |
+| `token-ledger report` | 이름 짓기 포함 약 8초 | 새 묶음이 있을 때만 작은 Haiku 호출 한 번 |
+
+모델을 아예 쓰지 않으려면 `"classify": false`로 설정하세요.
+
+## 명령어
 
 | Claude Code에서 | CLI | 하는 일 |
 |---|---|---|
-| `/token-ledger:report` | `token-ledger report` | 새 프롬프트를 작업 단위로 묶고 `token-ledger-out/report.html`을 만든다 |
-| `/token-ledger:tag <이름>` | `token-ledger tag <이름>` | 이후 프롬프트에 태그를 붙인다 (`off`로 끈다) |
-| `/token-ledger:vocab` | `token-ledger vocab list\|merge\|rename\|ok` | 작업 단위 이름을 정리한다 |
-| | `token-ledger summary --by branch` | 터미널에서 합계를 빠르게 본다 |
-| | `token-ledger hook status\|install\|uninstall` | pre-commit hook을 관리한다 |
+| `/token-ledger:init` | `token-ledger init` | 이 레포에서 token-ledger를 켭니다 |
+| `/token-ledger:report` | `token-ledger report` | 새 프롬프트를 묶은 뒤 `token-ledger-out/report.html`을 만듭니다 |
+| `/token-ledger:tag <name>` | `token-ledger tag <name>` | 이후 프롬프트에 태그를 붙입니다 (`off`로 끔) |
+| `/token-ledger:vocab` | `token-ledger vocab list\|merge\|rename\|ok` | 작업 단위 이름을 합치고, 바꾸고, 확인 처리합니다 |
+| | `token-ledger summary --by branch` | 터미널에서 간단히 합계를 봅니다 |
+| | `token-ledger hook status\|install\|uninstall` | 내 pre-commit hook만 관리합니다 |
 
-**작업 단위**는 자동으로 찾는다. 같은 파일을 고친 프롬프트, 한 세션에서 이어진 프롬프트, 같은 기능 브랜치의 프롬프트를 묶고, 새로 생긴 묶음마다 Claude Haiku(`claude -p --model haiku`)가 파일 경로, 브랜치, 세션 제목을 보고 짧은 이름을 붙인다. 이름은 `token-ledger-out/vocabulary.jsonl`에 저장되고 다시 쓰이므로, 한 묶음은 한 번만 이름을 붙인다. `token-ledger-out/config.json`에서 `"classify": false`로 두거나 `--no-classify`를 주면 모델 없이 파일 이름으로 이름을 붙인다.
+## 설정
 
-**태그**는 사람이 직접 붙이는 라벨(릴리스, 실험 등)이고 작업 단위에는 영향을 주지 않는다.
+`token-ledger-out/config.json`:
 
-**개인정보.** 커밋되는 기록에는 숫자, 브랜치, 태그, 세션 제목, 레포 기준 경로, 그리고 팀원의 `git config user.name`이 들어간다. 켜기 전에 팀에 알린다. 설정의 `"per_member": false`는 팀원별 보기를 숨기는 용도로 예약해 두었다.
+| 키 | 기본값 | 의미 |
+|---|---|---|
+| `classify` | `true` | 새 작업 단위 이름을 Claude Haiku로 짓습니다. `false`면 파일 이름, 브랜치, 세션 제목 순으로 가져옵니다. |
+| `per_member` | `true` | 팀원별 보기를 숨기기 위해 예약된 키입니다. 아직 구현되지 않았습니다. |
+
+## 개인정보
+
+- **커밋되지 않는 것:** 프롬프트 내용과 답변. 짧은 발췌는 내 컴퓨터의 `.git/token-ledger/`에만 남습니다.
+- **커밋되는 것:** 숫자, 브랜치, 태그, 세션 제목, 레포 기준 경로, 각 팀원의 `git config user.name`.
+- **예외 하나:** 파일을 바꾸지 않았고 내 프롬프트로만 이루어진 작업 단위는 그 프롬프트의 짧은 발췌로 이름을 짓습니다. 그래서 이름에 질문 내용이 드러날 수 있습니다.
+- **팀에 알리기:** 켜기 전에 팀에 알리세요. 각자 `token-ledger hook uninstall`로 자기 컴퓨터에서 끌 수 있습니다.
+
+## 자주 묻는 질문
+
+**커밋했는데 마지막 프롬프트가 없어요.**
+아직 실행 중이었거나 세션이 30분 동안 조용하지 않았기 때문입니다. 다음 커밋 때 들어갑니다.
+
+**리포트를 갱신하려면 커밋해야 하나요?**
+아니요. `token-ledger report`는 `token-ledger-out/data/`의 모든 기록을 읽습니다. pull을 받으면 팀원 기록도 포함됩니다. 내 최신 프롬프트를 바로 넣으려면 먼저 `token-ledger collect`를 실행하세요.
+
+**비용이 실제로 내는 금액인가요?**
+API 정가(2026-11-03 확인) 기준 추정치입니다. 구독 요금제라면 같은 사용량을 API로 썼을 때의 금액입니다. 가격을 모르는 모델은 비용을 표시하지 않습니다.
+
+**워크트리와 서브에이전트도 되나요?**
+네. 같은 레포의 워크트리는 합쳐서 보여주고, 서브에이전트 토큰은 그 서브에이전트를 시작한 프롬프트에 더해집니다.
+
+**레포에 이미 pre-commit hook이 있어요.**
+셸 스크립트라면 한 줄을 추가하고, 커밋을 막는 일은 없습니다. 셸 스크립트가 아니거나 hook이 추적되는 폴더에 있으면, `token-ledger hook install`이 직접 추가할 줄을 알려줍니다.
+
+## 요구 사항
+
+- Claude Code
+- git
+- Python 3.9 이상 (`uv`로 설치)
+- 이름 짓기에는 PATH에 `claude`가 필요합니다. 없으면 파일 이름으로 짓습니다.
 
 ## 상태
 
-초기 뼈대 (v0.1.0). 첫 안정 버전 전까지는 호환되지 않는 변경이 있을 수 있다.
+v0.1.0, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 설계 노트: [`docs/design.md`](docs/design.md).
+
+## 라이선스
+
+[MIT](LICENSE)
