@@ -34,6 +34,25 @@ def _base(model: str):
     return PRICES.get(model_key(model))
 
 
+def usage_cost(key: str, u: dict) -> float | None:
+    """Cost of one row's per-model totals (key may end in " (fast)"); None for an unknown model.
+
+    shortcut: Haiku 5.5's long-prompt rate is per request and can't be told from totals, so the base
+    rate is used; fine for repricing rows that had no price at all, wrong if used to correct old prices.
+    Rows from 0.1.x lack cache_write_1h and the fast key, so their repriced cost can be low.
+    """
+    fast = key.endswith(" (fast)")
+    price = _base(key[: -len(" (fast)")] if fast else key)
+    if price is None:
+        return None
+    p_in, p_out, p_read = price
+    g = lambda k: u.get(k) or 0
+    w1h = g("cache_write_1h")
+    cost = (g("input") * p_in + g("output") * p_out + g("cache_read") * p_read
+            + max(g("cache_write") - w1h, 0) * p_in * 1.25 + w1h * p_in * 2) / 1e6
+    return cost * 2 if fast else cost
+
+
 def request_cost(model: str | None, usage: dict) -> float | None:
     """Cost of one API request, or None when the model has no known price."""
     price = _base(model or "")

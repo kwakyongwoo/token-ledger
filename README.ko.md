@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.1-111111?style=flat-square" alt="Version 0.1.1">
+  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
@@ -76,7 +76,8 @@ uv tool install git+https://github.com/kwakyongwoo/token-ledger
 커밋되는 기록 한 줄에는 다음이 들어갑니다:
 - 모델별 토큰: 입력, 출력, 캐시 쓰기, 캐시 읽기, thinking
 - API 정가 기준 비용
-- 걸린 시간
+- 작업 시간 (사용자를 기다리는 시간처럼 5분 넘는 공백은 빼고 계산)
+- Claude Code 버전
 - 도구 호출과 서브에이전트 수
 - 브랜치, 워크트리, 태그
 - 세션 제목과 수정한 파일의 레포 기준 경로
@@ -125,6 +126,8 @@ token-ledger report ──> 작업 단위로 묶기 ──> 새 단위 이름 �
 | `/token-ledger:tag <name>` | `token-ledger tag <name>` | 이후 프롬프트에 태그를 붙입니다 (`off`로 끔) |
 | `/token-ledger:vocab` | `token-ledger vocab list\|merge\|rename\|ok` | 작업 단위 이름을 합치고, 바꾸고, 확인 처리합니다 |
 | | `token-ledger summary --by branch` | 터미널에서 간단히 합계를 봅니다 |
+| | `token-ledger doctor` | 설정, 빠진 기록, 대화 기록 형식 변경을 점검합니다 |
+| | `token-ledger collect --rebuild` | 기록이 사라진 프롬프트를 다시 추가합니다 (예: `git reset --hard` 이후) |
 | | `token-ledger hook status\|install\|uninstall` | 내 pre-commit hook만 관리합니다 |
 
 ## 설정
@@ -134,7 +137,6 @@ token-ledger report ──> 작업 단위로 묶기 ──> 새 단위 이름 �
 | 키 | 기본값 | 의미 |
 |---|---|---|
 | `classify` | `true` | 새 작업 단위 이름을 Claude Haiku로 짓습니다. `false`면 파일 이름, 브랜치, 세션 제목 순으로 가져옵니다. |
-| `per_member` | `true` | 팀원별 보기를 숨기기 위해 예약된 키입니다. 아직 구현되지 않았습니다. |
 
 ## 개인정보
 
@@ -169,7 +171,7 @@ API 정가(2026-11-03 확인) 기준 추정치입니다. 구독 요금제라면 
 
 ## 상태
 
-v0.1.1, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 설계 노트: [`docs/design.md`](docs/design.md).
+v0.2.0, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 설계 노트: [`docs/design.md`](docs/design.md).
 
 ## 라이선스
 

@@ -1,6 +1,6 @@
 # token-ledger design
 
-Status: agreed 2026-11-20; v0.1.0 built. `per_member: false` is reserved and not implemented yet.
+Status: agreed 2026-11-20; v0.2.0 built. The `per_member` switch was dropped in 0.2.0.
 
 ## Goal
 
@@ -37,7 +37,7 @@ token-ledger-out/                 committed, shared
 ├── data/<member>/<time>-<rand>.jsonl  one row per prompt; a new file per collect, never edited (no merge conflicts); readers dedupe by prompt id
 ├── units/<member>/<time>-<rand>.jsonl  {id, unit} assignments, write-once; the first assignment of a prompt wins
 ├── vocabulary.jsonl              one work unit name per line (aliases, NEW flag), sorted so edits merge cleanly
-├── config.json                   {"classify": true, "per_member": true}
+├── config.json                   {"classify": true}
 └── report.html                   gitignored, built locally
 .git/token-ledger/                local only, never tracked
 ├── state.json                    last collected point
@@ -90,7 +90,7 @@ Teammates install the plugin themselves (listing it in the repo's `.claude/setti
 
 - Prompt text never leaves the member's machine.
 - Transcript format is undocumented; the reader must skip unknown lines and fields instead of failing.
-- Per-member stats can be personal data: tell the team before enabling. A `per_member: false` switch is reserved for hiding the member view (not implemented).
+- Per-member stats can be personal data: tell the team before enabling.
 - Prompts never followed by a commit stay out of team stats until the member's next commit in the repo.
 - Changed files come from Edit/Write tool calls only; edits made through Bash (sed, heredocs) are not seen, so file links are sparser than the real work.
 - Rows are attributed by each response's `cwd`, so a session that moves between repos splits correctly.

@@ -6,12 +6,22 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .pricing import request_cost
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+FAST = " (fast)"  # suffix of the model key for fast-mode requests, priced at 2x
+ACTIVE_GAP = 300  # seconds; longer gaps (waiting on the person, idle) do not count as working time
+
+
+def _epoch(ts) -> float | None:
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, ValueError):
+        return None
 
 
 def projects_dir() -> Path:
@@ -55,6 +65,7 @@ class Usage:
     input: int = 0
     output: int = 0
     cache_write: int = 0
+    cache_write_1h: int = 0  # part of cache_write, billed at 2x input instead of 1.25x
     cache_read: int = 0
     thinking: int = 0  # part of output, kept for display only
     cost: float | None = 0.0
@@ -64,6 +75,7 @@ class Usage:
         self.input += u.get("input_tokens") or 0
         self.output += u.get("output_tokens") or 0
         self.cache_write += u.get("cache_creation_input_tokens") or 0
+        self.cache_write_1h += (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0
         self.cache_read += u.get("cache_read_input_tokens") or 0
         self.thinking += (u.get("output_tokens_details") or {}).get("thinking_tokens") or 0
         c = request_cost(model, u)
@@ -86,6 +98,17 @@ class Prompt:
     subagents: int = 0
     seen_requests: set = field(default_factory=set)
     last_stop: str | None = None  # stop_reason of the latest main-thread response
+    times: list = field(default_factory=list)  # epoch seconds of every line, main thread and subagents
+    cc: str | None = None  # Claude Code version that wrote the transcript
+
+    def touch(self, d: dict) -> None:
+        t = _epoch(d.get("timestamp"))
+        if t is not None:
+            self.times.append(t)
+
+    def active_seconds(self) -> float:
+        ts = sorted(self.times)
+        return sum(b - a for a, b in zip(ts, ts[1:]) if b - a <= ACTIVE_GAP)
 
     def add_assistant(self, d: dict, in_repo) -> None:
         msg = d.get("message") or {}
@@ -109,7 +132,9 @@ class Prompt:
             return
         if self.cwd is None:
             self.cwd, self.branch = d.get("cwd"), d.get("gitBranch")
-        self.models.setdefault(model, Usage()).add(model, usage)
+        self.cc = self.cc or d.get("version")
+        key = model + (FAST if usage.get("speed") == "fast" else "")
+        self.models.setdefault(key, Usage()).add(model, usage)
         self.end_ts = d.get("timestamp") or self.end_ts
 
 
@@ -147,9 +172,12 @@ def read_session(path: Path, offset: int, in_repo, idle: bool, long_idle: bool):
         elif is_prompt(d):
             pid = d.get("promptId") or d.get("uuid")
             prompts.append((start, Prompt(pid, d.get("sessionId", path.stem), d.get("timestamp", ""), excerpt(d))))
-        elif t == "assistant" and prompts and not d.get("isSidechain"):
-            prompts[-1][1].add_assistant(d, in_repo)
-            prompts[-1][1].last_stop = (d.get("message") or {}).get("stop_reason") or prompts[-1][1].last_stop
+            prompts[-1][1].touch(d)
+        elif prompts and not d.get("isSidechain") and t in ("assistant", "user"):
+            prompts[-1][1].touch(d)
+            if t == "assistant":
+                prompts[-1][1].add_assistant(d, in_repo)
+                prompts[-1][1].last_stop = (d.get("message") or {}).get("stop_reason") or prompts[-1][1].last_stop
     next_offset = end  # just past the last complete line
     closed_at_eof = long_idle or (idle and bool(prompts) and prompts[-1][1].last_stop == "end_turn")
     if prompts and not closed_at_eof:
@@ -184,6 +212,7 @@ def add_subagents(session_path: Path, p: Prompt, in_repo) -> None:
         p.subagents += 1
         before = len(p.tool_use_ids)
         for _, _, d in _lines(jsonl, 0):
+            p.touch(d)
             if d.get("type") == "assistant":
                 d = dict(d, isSidechain=False)
                 p.add_assistant(d, in_repo)

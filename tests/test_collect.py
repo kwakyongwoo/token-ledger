@@ -88,6 +88,8 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(p1["branch"], "feat/x")
         self.assertEqual(p1["member"], "Test User")
         self.assertAlmostEqual(p1["cost"], 3 * request_cost(OPUS, U), places=9)
+        self.assertEqual(p1["duration_s"], 30.0)  # first line 00:00:00, last main-thread line 00:00:30
+        self.assertEqual(u["cache_write_1h"], 0)
         self.assertNotIn("fix the parser", out.read_text())  # prompt text stays local
         local = (Path(c.Repo(cwd=str(self.repo)).state_dir) / "local.jsonl").read_text()
         self.assertIn("fix the parser", local)
@@ -127,6 +129,45 @@ class CollectTest(unittest.TestCase):
         ids = [r["id"] for r in self.run_collect(idle=True)[0]]
         self.assertIn("w1", ids)  # remembered worktree still counts after removal
         self.assertNotIn("n1", ids)  # belongs to the nested repo
+
+    def test_rebuild_restores_lost_rows(self):
+        _, out = self.run_collect(idle=False)
+        out.unlink()  # e.g. git reset --hard before the commit landed
+        self.assertEqual(self.run_collect(idle=False)[0], [])  # offsets moved on: a normal run can't see it
+        repo = c.Repo(cwd=str(self.repo))
+        rows, local, state = c.collect(repo, now=time.time(), rebuild=True)
+        self.assertEqual([r["id"] for r in rows], ["p1"])
+        c.write(repo, rows, local, state, stage=False)
+        self.assertEqual(c.collect(repo, now=time.time(), rebuild=True)[0], [])
+        # a row committed on another branch counts as present
+        for f in (Path(self.root) / c.OUT_DIR / "data").glob("*/*.jsonl"):
+            f.unlink()
+        g = lambda *a: subprocess.run(["git", *a], cwd=self.repo, check=True, capture_output=True)
+        g("checkout", "-q", "-b", "side")
+        c.write(repo, *c.collect(repo, now=time.time(), rebuild=True), stage=True)
+        g("commit", "-q", "-m", "rows")
+        g("checkout", "-q", "main")
+        self.assertEqual(c.collect(repo, now=time.time(), rebuild=True)[0], [])
+
+    def test_fast_mode_and_repricing(self):
+        with open(self.session, "a") as f:
+            f.write(json.dumps(human("p4", "2026-11-20T00:03:00Z", "fast one", self.root, 4)) + "\n")
+            f.write(json.dumps(assistant("r5", "2026-11-20T00:03:05Z", self.root, dict(U, speed="fast"))) + "\n")
+            f.write(json.dumps(assistant("r6", "2026-11-20T00:03:09Z", self.root, U)) + "\n")
+        rows = {r["id"]: r for r in self.run_collect(idle=True)[0]}
+        m = rows["p4"]["models"]
+        self.assertEqual(sorted(m), [OPUS, OPUS + " (fast)"])
+        self.assertAlmostEqual(m[OPUS + " (fast)"]["cost"], 2 * request_cost(OPUS, U), places=6)
+        # a row written when the model had no price gets one on read, from its stored totals
+        row = json.loads(json.dumps(rows["p4"]))
+        for u in row["models"].values():
+            u["cost"] = None
+        row["cost"] = None
+        d = Path(self.root) / c.OUT_DIR / "data" / "old"
+        d.mkdir(parents=True)
+        (d / "0.jsonl").write_text(json.dumps(dict(row, id="old")) + "\n")
+        old = next(r for r in c.read_all(Path(self.root)) if r["id"] == "old")
+        self.assertAlmostEqual(old["cost"], rows["p4"]["cost"], places=5)
 
     def test_pricing(self):
         # opus 5.5: 10*4 + 100*20 + 1000*0.2 + 200*4*1.25 per MTok

@@ -14,7 +14,7 @@ def cmd_collect(args) -> int:
     repo = c.Repo()
     if args.stage and not install.has_ledger(repo):  # hook in a repo without token-ledger: do nothing
         return 0
-    rows, local, state = c.collect(repo, idle_minutes=args.idle_minutes)
+    rows, local, state = c.collect(repo, idle_minutes=args.idle_minutes, rebuild=args.rebuild)
     if args.dry_run:
         for r in rows:
             print(json.dumps(r, ensure_ascii=False, sort_keys=True))
@@ -162,6 +162,60 @@ def cmd_hook(args) -> int:
     return 0
 
 
+def cmd_doctor(args) -> int:
+    from . import install, pricing, transcripts
+    repo = c.Repo()
+    problems = 0
+
+    def say(ok: bool, msg: str) -> None:
+        nonlocal problems
+        problems += not ok
+        print(("ok    " if ok else "warn  ") + msg)
+
+    say(install.has_ledger(repo), "token-ledger-out/config.json " + ("found" if install.has_ledger(repo) else "missing: run token-ledger init"))
+    state = install.hook_state(repo)
+    say(state == "installed", f"pre-commit hook: {state}")
+    say(transcripts.projects_dir().is_dir(), f"transcripts: {transcripts.projects_dir()}")
+
+    # format drift: responses with usage in this repo, but no prompt recognised in the same file
+    def mtime(p):
+        try:
+            return p.stat().st_mtime
+        except OSError:
+            return 0
+
+    drift, sessions = [], 0
+    for path in sorted(transcripts.projects_dir().glob("*/*.jsonl"), key=mtime, reverse=True)[:30]:
+        usage = prompts = 0
+        try:
+            for _, _, d in transcripts._lines(path, 0):
+                if transcripts.is_prompt(d):
+                    prompts += 1
+                elif d.get("type") == "assistant" and (d.get("message") or {}).get("usage") and repo.in_repo(d.get("cwd")):
+                    usage += 1
+        except OSError:  # removed while scanning
+            continue
+        sessions += usage > 0
+        if usage and not prompts:
+            drift.append(path.name)
+    say(not drift, f"{sessions} recent sessions used this repo" +
+        (f"; {len(drift)} have responses but no prompts (transcript format changed?): {', '.join(drift[:3])}" if drift else ""))
+
+    rows = c.read_all(repo.root)
+    unknown = sorted({m for r in rows for m, u in r["models"].items() if u.get("cost") is None})
+    say(not unknown, f"{len(rows)} rows in the ledger" + (f"; no price for: {', '.join(unknown)}" if unknown else ""))
+    versions = sorted({r["cc"] for r in rows if r.get("cc")})
+    if versions:
+        print(f"      written by Claude Code {versions[0]}" + (f" to {versions[-1]}" if len(versions) > 1 else ""))
+    print(f"      prices as of {pricing.PRICES_DATE}")
+
+    missing, _, _ = c.collect(repo, rebuild=True)
+    say(not missing, "every closed prompt is in the ledger" if not missing else
+        f"{len(missing)} closed prompts are not in the ledger yet. Prompts since your last commit are expected; "
+        "if older ones are missing, run: token-ledger collect --rebuild")
+    return 1 if problems else 0
+
+
 def main(argv=None) -> int:
     from . import __version__
     ap = argparse.ArgumentParser(prog="token-ledger")
@@ -172,7 +226,11 @@ def main(argv=None) -> int:
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--quiet", action="store_true", help="print nothing when there is nothing new")
     p.add_argument("--idle-minutes", type=float, default=30, help="treat a session's last prompt as closed after this")
+    p.add_argument("--rebuild", action="store_true",
+                   help="read all transcripts again and add prompts missing from the shared data")
     p.set_defaults(func=cmd_collect)
+    p = sub.add_parser("doctor", help="check the setup and look for missing rows or transcript format changes")
+    p.set_defaults(func=cmd_doctor)
     p = sub.add_parser("summary", help="print totals from the shared data")
     p.add_argument("--by", default="session", choices=["session", "title", "branch", "member", "model", "tag", "worktree"])
     p.set_defaults(func=cmd_summary)

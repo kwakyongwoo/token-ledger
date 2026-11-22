@@ -123,7 +123,7 @@ def init(repo: Repo) -> list[str]:
     out.mkdir(exist_ok=True)
     cfg = out / "config.json"
     if not cfg.exists():
-        cfg.write_text(json.dumps({"classify": True, "per_member": True}, indent=2) + "\n")
+        cfg.write_text(json.dumps({"classify": True}, indent=2) + "\n")
         done.append(f"created {OUT_DIR}/config.json")
     added = [_append_line(repo.root / ".gitattributes", f"{OUT_DIR}/{d}/** linguist-generated") for d in ("data", "units")]
     if any(added):

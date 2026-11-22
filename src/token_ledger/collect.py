@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import transcripts
+from . import pricing, transcripts
 
 OUT_DIR = "token-ledger-out"
 SCHEMA = 1  # row format version ("v"); readers skip rows from newer versions
@@ -97,14 +97,10 @@ def to_row(p: transcripts.Prompt, repo: Repo, title: str | None, tag: str | None
     models = {}
     total = 0.0
     for m, u in sorted(p.models.items()):
-        models[m] = {k: getattr(u, k) for k in ("requests", "input", "output", "cache_write", "cache_read", "thinking")}
+        models[m] = {k: getattr(u, k) for k in ("requests", "input", "output", "cache_write", "cache_write_1h",
+                                                "cache_read", "thinking")}
         models[m]["cost"] = None if u.cost is None else round(u.cost, 6)
         total = None if u.cost is None or total is None else total + u.cost
-    duration = None
-    try:
-        duration = round((_ts(p.end_ts) - _ts(p.ts)), 1) if p.end_ts else None
-    except ValueError:
-        pass
     return {
         "v": SCHEMA,
         "id": p.id,
@@ -117,19 +113,21 @@ def to_row(p: transcripts.Prompt, repo: Repo, title: str | None, tag: str | None
         "tag": tag,
         "models": models,
         "cost": None if total is None else round(total, 6),
-        "duration_s": duration,
+        "duration_s": round(p.active_seconds(), 1),  # working time: gaps over 5 minutes are left out
+        "cc": p.cc,
         "tools": p.tools,
         "subagents": p.subagents,
         "files": sorted(files),
     }
 
 
-def _ts(s: str) -> float:
-    return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None,
+            rebuild: bool = False) -> tuple[list[dict], list[dict], dict]:
+    """Return (rows, local_rows, new_state) without writing anything.
 
-
-def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> tuple[list[dict], list[dict], dict]:
-    """Return (rows, local_rows, new_state) without writing anything."""
+    rebuild reads every transcript from the start and keeps only prompts missing from token-ledger-out/data,
+    e.g. after a chunk file was lost to `git reset --hard` or a deleted branch.
+    """
     now = time.time() if now is None else now
     state = _load(repo.state_dir / "state.json", {"files": {}})
     seen = [Path(w) for w in state.get("worktrees", [])]
@@ -152,7 +150,7 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> t
             stat = path.stat()
         except OSError:
             continue
-        offset = entry.get("offset", 0)
+        offset = 0 if rebuild else entry.get("offset", 0)
         if offset > stat.st_size:  # file was rewritten: start over
             offset = 0
         if offset == stat.st_size:
@@ -175,6 +173,11 @@ def collect(repo: Repo, idle_minutes: float = 30, now: float | None = None) -> t
             rows.append(to_row(p, repo, title, active_tag(tags, p.ts)))
             local.append({"id": p.id, "excerpt": p.excerpt})
         files[key] = {"offset": next_offset, "title": title}
+    if rebuild:
+        have = known_ids(repo)
+        rows = [r for r in rows if r["id"] not in have]
+        keep = {r["id"] for r in rows}
+        local = [l for l in local if l["id"] in keep]
     return rows, local, state
 
 
@@ -226,6 +229,37 @@ def write(repo: Repo, rows: list[dict], local: list[dict], state: dict, stage: b
     return out
 
 
+def known_ids(repo: Repo) -> set:
+    """Prompt ids in the shared data of this checkout and of every local and remote branch,
+    including rows from newer formats, so a rebuild never re-adds a row that exists elsewhere."""
+    ids = set()
+    for f in (repo.root / OUT_DIR / "data").glob("*/*.jsonl"):
+        ids.update(_ID.findall("\n".join(_read_lines(f))))
+    refs = git("for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", cwd=str(repo.root)).split()
+    if refs:
+        found = subprocess.run(["git", "grep", "-h", "-o", "-E", _ID.pattern, *refs, "--", f"{OUT_DIR}/data"],
+                               cwd=repo.root, capture_output=True, text=True).stdout
+        ids.update(_ID.findall(found))
+    return ids
+
+
+_ID = re.compile(r'"id": "([^"]+)"')
+
+
+def _reprice(r: dict) -> dict:
+    """Fill in costs that were unknown when the row was written but are known to this version."""
+    if r.get("cost") is not None:
+        return r
+    total = 0.0
+    for m, u in r["models"].items():
+        if isinstance(u, dict) and u.get("cost") is None:
+            u["cost"] = pricing.usage_cost(m, u)
+        cost = u.get("cost") if isinstance(u, dict) else None
+        total = None if cost is None or total is None else total + cost
+    r["cost"] = None if total is None else round(total, 6)
+    return r
+
+
 def read_all(root: Path, warn: bool = True) -> list[dict]:
     """Every shared row in the repo, deduplicated by prompt id. Rows from a newer format are skipped."""
     seen, newer, bad = {}, 0, 0
@@ -243,7 +277,7 @@ def read_all(root: Path, warn: bool = True) -> list[dict]:
             if r.get("v") != SCHEMA or not isinstance(r.get("models"), dict):
                 bad += 1
                 continue
-            seen.setdefault(r["id"], r)
+            seen.setdefault(r["id"], _reprice(r))
     if newer and warn:
         print(f"token-ledger: skipped {newer} rows from a newer token-ledger; update the CLI", file=sys.stderr)
     if bad and warn:

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.1-111111?style=flat-square" alt="Version 0.1.1">
+  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
@@ -76,7 +76,8 @@ Teammates only need steps 1 and 2. When they open the repo, a SessionStart hook 
 Each committed row holds:
 - tokens per model: input, output, cache write, cache read and thinking
 - cost at API list prices
-- duration
+- working time (gaps over 5 minutes, such as waiting for you, are left out)
+- the Claude Code version
 - tool calls and subagents
 - branch, worktree and tag
 - the session title and the repo-relative paths of edited files
@@ -125,6 +126,8 @@ Set `"classify": false` to skip the model completely.
 | `/token-ledger:tag <name>` | `token-ledger tag <name>` | Tags the prompts that follow (`off` to stop) |
 | `/token-ledger:vocab` | `token-ledger vocab list\|merge\|rename\|ok` | Merges, renames and confirms work unit names |
 | | `token-ledger summary --by branch` | Quick totals in the terminal |
+| | `token-ledger doctor` | Checks the setup, missing rows and transcript format changes |
+| | `token-ledger collect --rebuild` | Re-adds prompts whose rows were lost (for example to `git reset --hard`) |
 | | `token-ledger hook status\|install\|uninstall` | Manages the pre-commit hook for you only |
 
 ## Configuration
@@ -134,7 +137,6 @@ Set `"classify": false` to skip the model completely.
 | Key | Default | Meaning |
 |---|---|---|
 | `classify` | `true` | Name new work units with Claude Haiku. `false` names them from file names, then the branch, then the session title. |
-| `per_member` | `true` | Reserved for hiding the member view. Not implemented yet. |
 
 ## Privacy
 
@@ -169,7 +171,7 @@ If it is a shell script, token-ledger adds one line to it and never blocks the c
 
 ## Status
 
-v0.1.1, early. The data format may change before 1.0. Design notes: [`docs/design.md`](docs/design.md).
+v0.2.0, early. The data format may change before 1.0. Design notes: [`docs/design.md`](docs/design.md).
 
 ## License
 
