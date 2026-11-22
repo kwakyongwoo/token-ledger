@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-111111?style=flat-square" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/version-0.1.1-111111?style=flat-square" alt="Version 0.1.1">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
@@ -25,7 +25,7 @@
 token-ledger는 git 레포에서 쓰인 모든 Claude Code 프롬프트의 토큰 사용량을 팀원 모두에 대해 기록합니다. 기록은 git으로 공유되므로 모든 팀원이 같은 숫자를 봅니다. 그다음 프롬프트를 `report-filters`, `pricing-fix` 같은 작업 단위로 묶고, 필터와 그룹 기준을 바꿔 볼 수 있는 HTML 리포트를 만듭니다.
 
 - **새 습관이 필요 없습니다.** 기록은 pre-commit hook이 추가합니다. 평소처럼 작업하고 커밋하면 됩니다.
-- **git에 프롬프트 내용이 없습니다.** 커밋되는 기록에는 숫자, 브랜치, 태그, 바뀐 파일 경로만 들어갑니다.
+- **git에 프롬프트 내용이 없습니다.** 커밋되는 기록에는 숫자, 브랜치, 태그, 세션 제목, 바뀐 파일 경로가 들어갑니다. [개인정보](#개인정보)를 참고하세요.
 - **기능 단위로 묶입니다.** 같은 파일을 고친 프롬프트는 같은 작업 단위가 됩니다. 각 단위의 한 줄 이름은 Claude Haiku가 짓고, 모델을 끄면 파일 이름에서 가져옵니다.
 - **이름을 공유합니다.** 단어장 파일 덕분에 단위 이름이 팀 전체에서, 실행할 때마다 같게 유지됩니다.
 - **직접 붙이는 라벨도 있습니다.** 태그로 릴리스나 실험을 표시할 수 있고, 자동 묶음과는 따로 동작합니다.
@@ -139,7 +139,7 @@ token-ledger report ──> 작업 단위로 묶기 ──> 새 단위 이름 �
 ## 개인정보
 
 - **커밋되지 않는 것:** 프롬프트 내용과 답변. 짧은 발췌는 내 컴퓨터의 `.git/token-ledger/`에만 남습니다.
-- **커밋되는 것:** 숫자, 브랜치, 태그, 세션 제목, 레포 기준 경로, 각 팀원의 `git config user.name`.
+- **커밋되는 것:** 숫자, 브랜치, 태그, 세션 제목, 레포 기준 경로, 각 팀원의 `git config user.name`. Claude Code는 첫 프롬프트를 보고 세션 제목을 짓기 때문에, 세션 제목에서 질문 내용을 짐작할 수 있습니다.
 - **예외 하나:** 파일을 바꾸지 않았고 내 프롬프트로만 이루어진 작업 단위는 그 프롬프트의 짧은 발췌로 이름을 짓습니다. 그래서 이름에 질문 내용이 드러날 수 있습니다.
 - **팀에 알리기:** 켜기 전에 팀에 알리세요. 각자 `token-ledger hook uninstall`로 자기 컴퓨터에서 끌 수 있습니다.
 
@@ -169,7 +169,7 @@ API 정가(2026-11-03 확인) 기준 추정치입니다. 구독 요금제라면 
 
 ## 상태
 
-v0.1.0, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 설계 노트: [`docs/design.md`](docs/design.md).
+v0.1.1, 초기 버전입니다. 1.0 전까지 데이터 형식이 바뀔 수 있습니다. 설계 노트: [`docs/design.md`](docs/design.md).
 
 ## 라이선스
 

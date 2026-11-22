@@ -4,7 +4,7 @@ Write all docs, code comments and commit messages in English. Translated READMEs
 
 ## token-ledger
 
-This repo records Claude Code token usage per prompt in `token-ledger-out/` (no prompt text, only usage, branch, tag and changed file paths). A pre-commit hook adds new rows to each commit.
+This repo records Claude Code token usage per prompt in `token-ledger-out/` (no prompt text; usage, branch, tag, session title and changed file paths). A pre-commit hook adds new rows to each commit.
 
 - `/token-ledger:tag <name>` labels the following prompts with a tag; `/token-ledger:tag off` stops it.
 - `/token-ledger:report` builds `token-ledger-out/report.html`.

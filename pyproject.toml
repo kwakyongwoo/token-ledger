@@ -1,6 +1,6 @@
 [project]
 name = "token-ledger"
-version = "0.1.0"
+version = "0.1.1"
 description = "Per-prompt Claude Code token usage ledger, shared through git."
 readme = "README.md"
 license = "MIT"

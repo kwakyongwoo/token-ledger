@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ from pathlib import Path
 from . import transcripts
 
 OUT_DIR = "token-ledger-out"
+SCHEMA = 1  # row format version ("v"); readers skip rows from newer versions
 
 
 def git(*args: str, cwd: str | None = None) -> str:
@@ -104,7 +106,7 @@ def to_row(p: transcripts.Prompt, repo: Repo, title: str | None, tag: str | None
     except ValueError:
         pass
     return {
-        "v": 1,
+        "v": SCHEMA,
         "id": p.id,
         "ts": p.ts,
         "member": repo.member,
@@ -224,15 +226,26 @@ def write(repo: Repo, rows: list[dict], local: list[dict], state: dict, stage: b
     return out
 
 
-def read_all(root: Path) -> list[dict]:
-    """Every shared row in the repo, deduplicated by prompt id."""
-    seen = {}
+def read_all(root: Path, warn: bool = True) -> list[dict]:
+    """Every shared row in the repo, deduplicated by prompt id. Rows from a newer format are skipped."""
+    seen, newer, bad = {}, 0, 0
     for f in sorted((root / OUT_DIR / "data").glob("*/*.jsonl"), key=lambda f: (f.name, str(f))):
         for line in _read_lines(f):
             try:
                 r = json.loads(line)
             except ValueError:
                 continue
-            if isinstance(r, dict) and r.get("id"):
-                seen.setdefault(r["id"], r)
+            if not (isinstance(r, dict) and r.get("id")):
+                continue
+            if isinstance(r.get("v"), int) and r["v"] > SCHEMA:
+                newer += 1
+                continue
+            if r.get("v") != SCHEMA or not isinstance(r.get("models"), dict):
+                bad += 1
+                continue
+            seen.setdefault(r["id"], r)
+    if newer and warn:
+        print(f"token-ledger: skipped {newer} rows from a newer token-ledger; update the CLI", file=sys.stderr)
+    if bad and warn:
+        print(f"token-ledger: skipped {bad} malformed rows", file=sys.stderr)
     return list(seen.values())

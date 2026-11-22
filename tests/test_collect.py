@@ -139,6 +139,19 @@ class CollectTest(unittest.TestCase):
         self.assertGreaterEqual(request_cost(OPUS, no_total), 0)
         one_hour = dict(U, cache_creation={"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 200})
         self.assertAlmostEqual(request_cost(OPUS, one_hour) - request_cost(OPUS, U), 200 * 4 * (2 - 1.25) / 1e6)
+        # exact model match: a dated id keeps its price, a newer model gets none
+        self.assertAlmostEqual(request_cost("claude-haiku-4-5-20251001", U), request_cost("claude-haiku-4-5", U))
+        self.assertAlmostEqual(request_cost(OPUS + "[1m]", U), request_cost(OPUS, U))
+        self.assertIsNone(request_cost("claude-opus-5-6", U))
+        self.assertAlmostEqual(request_cost(OPUS + "@20261101", U), request_cost(OPUS, U))
+
+    def test_read_all_skips_newer_and_broken_rows(self):
+        d = Path(self.root) / c.OUT_DIR / "data" / "x"
+        d.mkdir(parents=True)
+        rows = [{"v": 1, "id": "a", "models": {}}, {"v": 2, "id": "b", "models": {}},
+                {"v": 1, "id": "c"}, {"id": "d", "models": {}}]
+        (d / "1.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        self.assertEqual([r["id"] for r in c.read_all(Path(self.root), warn=False)], ["a"])
 
 
 if __name__ == "__main__":

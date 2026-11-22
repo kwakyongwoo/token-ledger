@@ -29,21 +29,25 @@ def cmd_collect(args) -> int:
 
 def cmd_summary(args) -> int:
     rows = c.read_all(c.Repo().root)
-    by = defaultdict(lambda: [0, 0.0, 0, 0])
+    by = defaultdict(lambda: [0, 0.0, 0, 0, 0])  # prompts, cost, output, input, prompts without a price
+    g = lambda u, k: u.get(k) or 0
     for r in rows:
-        key = r.get(args.by) or "-"
-        if args.by == "model":
-            for m, u in r["models"].items():
-                b = by[m]
-                b[0] += 1; b[1] += u["cost"] or 0; b[2] += u["output"]; b[3] += u["input"] + u["cache_read"] + u["cache_write"]
-            continue
-        b = by[key]
-        b[0] += 1; b[1] += r["cost"] or 0
-        for u in r["models"].values():
-            b[2] += u["output"]; b[3] += u["input"] + u["cache_read"] + u["cache_write"]
-    print(f"{args.by:<40} {'prompts':>7} {'cost $':>9} {'out':>10} {'in(all)':>12}")
-    for k, (n, cost, out, inp) in sorted(by.items(), key=lambda kv: -kv[1][1]):
-        print(f"{str(k)[:40]:<40} {n:>7} {cost:>9.2f} {out:>10} {inp:>12}")
+        parts = r["models"].items() if args.by == "model" else [(r.get(args.by) or "-", None)]
+        for key, u in parts:
+            b = by[key]
+            b[0] += 1
+            cost = r.get("cost") if u is None else u.get("cost")
+            if cost is None:
+                b[4] += 1
+            else:
+                b[1] += cost
+            for x in ([u] if u is not None else r["models"].values()):
+                b[2] += g(x, "output"); b[3] += g(x, "input") + g(x, "cache_read") + g(x, "cache_write")
+    print(f"{args.by:<40} {'prompts':>7} {'cost $':>10} {'out':>10} {'in(all)':>12}")
+    for k, (n, cost, out, inp, unknown) in sorted(by.items(), key=lambda kv: -kv[1][1]):
+        print(f"{str(k)[:40]:<40} {n:>7} {cost:>9.2f}{'+' if unknown else ' '} {out:>10} {inp:>12}")
+    if any(b[4] for b in by.values()):
+        print("+ some prompts use a model without a known price; their cost is not included", file=sys.stderr)
     return 0
 
 
@@ -117,7 +121,7 @@ def cmd_tag(args) -> int:
             continue
         if isinstance(h, dict):
             history.append(h)
-    current = history[-1]["tag"] if history else None
+    current = history[-1].get("tag") if history else None
     if args.name is None:
         print(f"current tag: {current or '(none)'}")
         return 0

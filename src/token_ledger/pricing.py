@@ -1,6 +1,8 @@
 """API list prices in USD per million tokens, used to estimate cost per request."""
 from __future__ import annotations
 
+import re
+
 PRICES_DATE = "2026-11-03"  # claude-api skill model table; update here when prices change
 
 # model prefix: (input, output, cache_read). Cache writes are 1.25x input (5m TTL) and 2x input (1h TTL).
@@ -21,9 +23,15 @@ PRICES = {
 HAIKU_55_LONG = (0.50, 2.50, 0.05)
 
 
+def model_key(model: str) -> str:
+    """Model id without a date suffix or a context tag: claude-haiku-4-5-20251001[1m] -> claude-haiku-4-5,
+    claude-opus-5-5@20261101 (Vertex) -> claude-opus-5-5."""
+    return re.sub(r"-\d{8}$", "", re.sub(r"(@.*|\[.*\])$", "", model))
+
+
 def _base(model: str):
-    keys = [k for k in PRICES if model.startswith(k)]
-    return PRICES[max(keys, key=len)] if keys else None
+    # exact match only: a new model such as claude-opus-5-6 must not get claude-opus-5's price
+    return PRICES.get(model_key(model))
 
 
 def request_cost(model: str | None, usage: dict) -> float | None:
@@ -38,7 +46,7 @@ def request_cost(model: str | None, usage: dict) -> float | None:
     split = usage.get("cache_creation") or {}
     w1h = split.get("ephemeral_1h_input_tokens") or 0
     w5m = (split.get("ephemeral_5m_input_tokens") or 0) if split else write  # no split: assume the 5-minute TTL
-    if (model or "").startswith("claude-haiku-5-5") and inp + read + write > 100_000:
+    if model_key(model or "") == "claude-haiku-5-5" and inp + read + write > 100_000:
         price = HAIKU_55_LONG
     p_in, p_out, p_read = price
     cost = (inp * p_in + out * p_out + read * p_read + w5m * p_in * 1.25 + w1h * p_in * 2) / 1e6

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-111111?style=flat-square" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/version-0.1.1-111111?style=flat-square" alt="Version 0.1.1">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-111111?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/python-3.9%2B-111111?style=flat-square" alt="Python 3.9+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
@@ -25,7 +25,7 @@
 token-ledger records the token usage of every Claude Code prompt in a git repo, for everyone on the team. It shares that record through git, so every member sees the same numbers. Then it groups the prompts into work units, like `report-filters` or `pricing-fix`, and builds an HTML report you can filter and slice.
 
 - **No new habits.** Rows are added by a pre-commit hook. You keep working and committing as usual.
-- **No prompt text in git.** Committed rows hold numbers, branch, tag and changed file paths only.
+- **No prompt text in git.** Committed rows hold numbers, branch, tag, session title and changed file paths. See [Privacy](#privacy).
 - **Grouped by feature.** Prompts that edit the same files are put in one work unit. A one-line name for each unit comes from Claude Haiku, or from file names if you turn the model off.
 - **Shared names.** A vocabulary file keeps unit names the same across the team and across runs.
 - **Your own labels.** Tags mark a release or an experiment on top of the automatic grouping.
@@ -139,7 +139,7 @@ Set `"classify": false` to skip the model completely.
 ## Privacy
 
 - **Never committed:** prompt text and replies. Short excerpts stay on your machine in `.git/token-ledger/`.
-- **Committed:** numbers, branch, tag, session title, repo-relative paths, and each member's `git config user.name`.
+- **Committed:** numbers, branch, tag, session title, repo-relative paths, and each member's `git config user.name`. Claude Code names sessions from your first prompt, so a session title can hint at what you asked.
 - **One exception:** a work unit that changed no files and is made only of your own prompts is named from short excerpts of them. Its name can reflect what you asked.
 - **Telling your team:** do it before you turn this on. Anyone can opt out on their machine with `token-ledger hook uninstall`.
 
@@ -169,7 +169,7 @@ If it is a shell script, token-ledger adds one line to it and never blocks the c
 
 ## Status
 
-v0.1.0, early. The data format may change before 1.0. Design notes: [`docs/design.md`](docs/design.md).
+v0.1.1, early. The data format may change before 1.0. Design notes: [`docs/design.md`](docs/design.md).
 
 ## License
 
